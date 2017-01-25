@@ -16,3 +16,34 @@ Accounts to backup from:
 To Do:
 
 Test network speed for a variety of file sizes, number of files and directories, file systems.
+
+Notes:
+
+- Git Annex: 
+https://writequit.org/articles/getting-started-with-git-annex.html
+
+* Allows managing large files with git, without checking the contents into git.  Only a symlink is checked into git.  The symlink contains the SHA-1 of the file.
+* Syncs files between various storage services (cloud, personal cloud, removable HDs).
+* Has a drag and drop client/web app as well as a CLI.  It also has an Android version?
+* Written in Haskell.
+* Uses inotify.
+* Git annex uses rsync == scp for data transfers that are not custom, like many cloud services.
+* rsync 
+* Use -d option to see exactly what git annex executes so one can figure out what transfer protocol is used.
+* Info on tmp files being locked in the event of a git-annex interruption.
+* Git annex GUI (assistant): https://www.kickstarter.com/projects/joeyh/git-annex-assistant-like-dropbox-but-with-your-own
+
+I just wrote a post (http://mattshirley.com/Benchmarking-BitTorrent-for-large-transfers-of-next-generation-sequencing-data) benchmarking BitTorrent vs scp. I'm not going to benchmark against Aspera, since I don't have a server license, but I think as far as throughput it would go aspera,unison,udt > BitTorrent > scp,netcat,http,ftp,scp. The main benefit to using BitTorrent would be lightweight infrastructure and good, stable tools, as well as scalable distribution if you are sending data to more than one collaborator.
+
+Generally Useful References:
+
+https://github.com/swcarpentry/DEPRECATED-site/issues/797
+http://udt.sourceforge.net/software.html
+https://www.biostars.org/p/76628/
+http://www.failureasaservice.com/2015/05/file-transfer-tool-performance-globus.html
+http://pcbunn.cacr.caltech.edu/bbcp/using_bbcp.htm
+https://news.ycombinator.com/item?id=12398303
+
+- Git Annex RClone
+
+- DVCS-Autosync
