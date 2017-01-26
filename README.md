@@ -35,6 +35,22 @@ https://writequit.org/articles/getting-started-with-git-annex.html
 
 I just wrote a post (http://mattshirley.com/Benchmarking-BitTorrent-for-large-transfers-of-next-generation-sequencing-data) benchmarking BitTorrent vs scp. I'm not going to benchmark against Aspera, since I don't have a server license, but I think as far as throughput it would go aspera,unison,udt > BitTorrent > scp,netcat,http,ftp,scp. The main benefit to using BitTorrent would be lightweight infrastructure and good, stable tools, as well as scalable distribution if you are sending data to more than one collaborator.
 
+Installing Git-Annex:
+
+Downloaded tarball with all dependencies included from:
+https://git-annex.branchable.com/install/Linux_standalone/
+
+Set path to:
+PATH=$PATH:/pub/jtatar/tmp/git-annex.linux/bin (note to include /bin, and not top level dir)
+
+Installing RClone:
+http://rclone.org/downloads/
+Download the AMD64 bit binary
+
+Install git-annex-rclone:
+https://github.com/DanielDent/git-annex-remote-rclone
+Set path: PATH=$PATH:/pub/jtatar/tmp/git-annex-remote-rclone-master
+
 Generally Useful References:
 
 https://github.com/swcarpentry/DEPRECATED-site/issues/797
