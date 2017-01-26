@@ -41,7 +41,7 @@ Downloaded tarball with all dependencies included from:
 https://git-annex.branchable.com/install/Linux_standalone/
 
 Set path to:
-PATH=$PATH:/pub/jtatar/tmp/git-annex.linux/bin (note to include /bin, and not top level dir)
+PATH=$PATH:/pub/jtatar/tmp/git-annex.linux
 
 Installing RClone:
 http://rclone.org/downloads/
@@ -50,6 +50,20 @@ Download the AMD64 bit binary
 Install git-annex-rclone:
 https://github.com/DanielDent/git-annex-remote-rclone
 Set path: PATH=$PATH:/pub/jtatar/tmp/git-annex-remote-rclone-master
+
+1. Setting up Google Drive as a remote for git-annex-rclone:
+Login to the interactive node with X11 forwarding, since rclone/google drive need to create unique security tockens for seemless authentication.
+Mostly following instructions from: 
+- https://github.com/DanielDent/git-annex-remote-rclone
+- http://rclone.org/drive/
+
+git-annex-rclone note: Password-protected rclone configurations are not supported at this time, so when running rclone config don't pick the "Set Configuration Password" option at the end of running rclone config.
+
+2. Create a git-annex repository:
+https://git-annex.branchable.com/walkthrough/#index1h2
+
+3. Need to deal with locked files.
+
 
 Generally Useful References:
 
