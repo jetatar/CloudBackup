@@ -62,7 +62,46 @@ git-annex-rclone note: Password-protected rclone configurations are not supporte
 2. Create a git-annex repository:
 https://git-annex.branchable.com/walkthrough/#index1h2
 
-3. Need to deal with locked files.
+3. Need to deal with locked files: https://git-annex.branchable.com/tips/unlocked_files/
+
+
+ERRRR:  SHA-256 takes so long ... rclone may be faster.
+
+Let's repeat somewhat the goal:  Back up all of HPC for free.
+
+> Back up all of what I consider most important on HPC - the data.
+    > Backup /pub + /data/users/ = 100TB
+In phase 2:
+    > Backup all of the individual groups' file systems.
+In phase 3:
+    > Have an option for individual HPC users to specify the backups themselves.
+
+I am going to do all tests with rclone v1.35
+
+Important numbers:
+
+We are going to run rclone from fiona
+
+
+The numbers seem to be in our favour with a few caviats:
+James gets rclone transfer rates of 600MB/s if he opens many simultaneous sessions.  The theoretical max he should be able to push out is ~1.25GB/s.  I have hope that he can improve on that.  Even with 600MB/s, we can transfer 6TB in ~3 hours!!
+* Caviat number 1:
+That doesn't apply to large files since they can't be broken down and transferred in pieces (unless I make an option for that).
+
+Important features that the transfer client should definitely (hopefully) have:
+* Only sync changed segments of a file and not the whole file.
+    > According to "Why doesn’t rclone support partial transfers / binary diffs like rsync?" on http://rclone.org/faq/, no cloud storage system supports diff like rsync does because that breaks the 1:1 mapping of FS to Cloud.
+
+* Resume transfer where you left off.
+Partial transfers on the other hands would take more metadata.  That would also break the 1:1 mapping.
+
+* GUI
+Yes.  Now there is a nice RCloneBrowser.
+
+If we can get a sustained transfer rate of 50MB/s (currently James gets around 40MB/s) per file, it would take ~6h to transfer 1TB file.  It is not horrible, but not great either.
+
+Potential Problems:
+* The maximum file size that can be synced to google drive is 5TB (source: https://support.google.com/a/answer/172541?hl=en)
 
 
 Generally Useful References:
@@ -77,3 +116,46 @@ https://news.ycombinator.com/item?id=12398303
 - Git Annex RClone
 
 - DVCS-Autosync
+
+jjhhjj (Parasite) Backup Design:
+
+- Use Joseph's rsync lines for rclone.
+    > Problem with this is that users will have to backup the same stuff in both locations.  Can't backup more stuff than what's in their /sbak and they can't only backup to cloud.
+
+- Partially re-used Joseph's script.
+    > Reuse:
+        - User list creation
+        - Exclude and include file parsing.
+    
+    > Improve:
+        - One user one job in a queue.
+        - User interaction.  Display how the backup went for user on login.
+        - If user doesn't have ongoing backup and there are file modifications, run backup.  Can utilize current logins for that and a global backup once a day.  Each user has an angel running.
+        - Allow for multiple parallel streams per user.
+        - Option for deleting accounts that are no longer active.
+        - Option to optimize throughput on per user basis (break everything up into a file by file basis OR on per SIZE file/directory).
+
+- Have the users learn rclone and post a command in a .file that will get collected and executed.  Post an example that is easily adaptable.  This would have to be made into a GUI, since HPC users can't be expected to even correctly type in options.
+
+
+Code Structure:
+
+I am writing a scheduling system that is queue friendly.
+    - The problem with a very dynamic scheduling system is that I can't easily get a list of affected files, unless I edit the RClone source code.
+
+    - RClone does multiple transfers efficiently by having asyncronous threads specified by the number of transfers configured.  The problem with threads instead of code that queues everything is scalability.  Unless there is a way to connect two nodes and have their total cores be visible.
+    > Too much paralleizing doesn't make sense.  One must know what the individual parts of the backup process take the longest.
+    > We can't transfer faster than we can load the data into RAM sequentially.
+    > We can't transfer faster than the per rclone session speed with google drive.
+    > We can't transfer faster than 1.25GB/s, since we have 10Gb/s link max.
+    > We can't transfer faster than whatever throttling Google / Amazon, etc have.
+
+
+    - Taylor a user's RClone configuration on the profile of the files they are trying to save.
+
+Initialize one time things: log dirs
+    - in user's own dir
+    - they will have to run rclone config anyway to get a token
+Initialize things periodically: log dirs, users to backup, etc
+Parse user input
+Create rclone string
