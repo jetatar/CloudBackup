@@ -1,3 +1,56 @@
+RClone Initial Setup:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Goal:
 
 Google provies unlimited storage to UCI affiliates through their Google Drive service.  Since data storage and capacity are a constant issue (along with long term maintenance and support), it would be great if we could utilize Google Drive as much as possible for data storage.
@@ -18,6 +71,8 @@ To Do:
 Test network speed for a variety of file sizes, number of files and directories, file systems.
 
 Notes:
+
+- Google Drive Service Account
 
 - Git Annex: 
 https://writequit.org/articles/getting-started-with-git-annex.html

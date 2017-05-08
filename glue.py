@@ -30,6 +30,15 @@ def loadUsers( ):
 
     #print allUsers
 
+# Categorize the users below UID 500 as staff, > 65500 unknown
+#
+#def sortUsers( ):
+
+
+# Authenticate with google drive.
+#
+#def authenticate( ):
+
 
 # Main function.  Define so function can be called from other scripts.
 #
