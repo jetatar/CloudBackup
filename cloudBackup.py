@@ -1,17 +1,24 @@
 #!/bin/env python
 
+#
+#   NEED TO FIX:
+#       Wait for psutil to return before continuing the program.
+#
+#
+
+
 import sys
 import os.path
 import subprocess
 import psutil
 
 # Local configs
-basedir     = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
-rconfdir    = basedir + "/.config/rclone/rclone.conf"
-confname    = "gDrive"
-sourcefl    = basedir + "/.hpc-cloud-backup"
-excludefl   = basedir + "/.hpc-cloud-backup-exclude"
-
+basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
+rconfdir        = basedir + "/.config/rclone/rclone.conf"
+confname        = "gDrive"
+sourcefl        = basedir + "/.hpc-cloud-backup"
+cleansourcefl   = basedir + "/.hpc-cloud-backup-clean"
+excludefl       = basedir + "/.hpc-cloud-backup-exclude"
 
 # Remote configs
 remotebasedir = "UCI_HPC_Backup"
@@ -114,10 +121,11 @@ def parseSourceFile( sourcefl ):
 
     else:
         # Duplicating Selective Backup 'sed' string
+        # Note: This excludes wild-cards being allowed for paths in the source file.
         sedstr  = [ "s/\..//", "s/([`$&|><?])//g", "s/#.*//", "s,/\+$,,",\
                     "s/^[ \t]*//", "s/ *$//", "/^$/d" ]
 
-        outfl   = open( sourcefl + "-clean", "w" )
+        outfl   = open( cleansourcefl, "w" )
 
         cmd     = ( ['sed', '-e', sedstr[0], '-e', sedstr[1], '-e', sedstr[2],\
                     '-e', sedstr[3], '-e', sedstr[4], '-e', sedstr[5],\
@@ -125,9 +133,11 @@ def parseSourceFile( sourcefl ):
 
         res     = subprocess.call( cmd, stdout = outfl ) 
 
+        outfl.close( )
+
 
 #
-#   Parse source paths
+#   Parse paths
 #
 def prepPaths( ):
 
@@ -136,6 +146,7 @@ def prepPaths( ):
         if os.stat(sourcefl).st_size > 0:
 
             parseSourceFile( sourcefl )
+            #excludePaths( )
 
             print "-> Found file {0} with paths to backup.".format( sourcefl )
 
@@ -156,7 +167,40 @@ def prepPaths( ):
         sys.exit( )
 
 
+#
+#   Prepare final RClone argument string:
+#       setsid rclone copy -vv [source] [destination] --exclude-from filesToExclude.txt --dump-filters --log-file ~/hpc_pubdir_cloud_backup.log --transfers=32 --checkers=16 --drive-chunk-size=16384k --drive-upload-cutoff=16384k --drive-use-trash &>/dev/null
+#
+#
+def prepExecStrings( ):
+    
+    if os.path.isfile(cleansourcefl):
+        
+        if os.stat(cleansourcefl).st_size > 0:
 
+            with open(cleansourcefl) as fl:
+                spath = [ p.strip() for p in fl.readlines( ) ]
+                epath = [ "{0}:{1}{2}".format(confname, remotebasedir, sp)\
+                                        for sp in spath ]
+                args  = [ "--transfers=32 --checkers=16 --drive-chunk-size=16384k"\
+                          " --drive-upload-cutoff=16384k" ]
+                print spath
+                print epath
+
+        else:
+
+            print "!!! Clean source file {0} is empty.  Nothing to backup!..."\
+                                                            .format( sourcefl )
+
+            sys.exit( )
+
+            
+    else:
+
+        print "!!! Couldn't find a cleaned source file {0}."\
+                                                            .format( cleansourcefl )
+
+        sys.exit( )
 
 def main( ):
 
@@ -167,7 +211,7 @@ def main( ):
         # prepSourcePaths
         # excludeSourcePaths
         # prepDestPaths
-    #prepExecString( )
+    prepExecStrings( )
 
 
 if __name__ == "__main__":
