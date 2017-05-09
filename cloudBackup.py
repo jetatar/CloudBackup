@@ -19,6 +19,7 @@ confname        = "gDrive"
 sourcefl        = basedir + "/.hpc-cloud-backup"
 cleansourcefl   = basedir + "/.hpc-cloud-backup-clean"
 excludefl       = basedir + "/.hpc-cloud-backup-exclude"
+rclonecmdfl     = basedir + "/.hpc-cloud-backup-rclonecmd"
 
 # Remote configs
 remotebasedir = "UCI_HPC_Backup"
@@ -179,13 +180,29 @@ def prepExecStrings( ):
         if os.stat(cleansourcefl).st_size > 0:
 
             with open(cleansourcefl) as fl:
+
+                #spath = p.strip() for p in fl.readlines( )
+
                 spath = [ p.strip() for p in fl.readlines( ) ]
                 epath = [ "{0}:{1}{2}".format(confname, remotebasedir, sp)\
                                         for sp in spath ]
-                args  = [ "--transfers=32 --checkers=16 --drive-chunk-size=16384k"\
-                          " --drive-upload-cutoff=16384k" ]
-                print spath
-                print epath
+                
+                fl.close( )
+
+            # TODO: Check excludefl exists.
+            # TODO: include --log-file 
+            cmd = [ "setsid rclone copy -vv {0} {1} --exclude-from {2} "\
+                        "--dump-filters --transfers=32 "\
+                        "--checkers=16 --drive-chunk-size=16384k "\
+                        "--drive-upload-cutoff=16384k --drive-use-trash "\
+                        "&>/dev/null".format(src, dest, excludefl) \
+                                        for (src, dest) in zip(spath, epath) ]
+
+            with open(rclonecmdfl, "w") as cfl:
+
+                cfl.write( '\n'.join(cmd) )
+                cfl.close( )
+
 
         else:
 
@@ -201,6 +218,7 @@ def prepExecStrings( ):
                                                             .format( cleansourcefl )
 
         sys.exit( )
+
 
 def main( ):
 
