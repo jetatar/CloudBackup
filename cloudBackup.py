@@ -4,7 +4,7 @@
 #   NEED TO FIX:
 #       Wait for psutil to return before continuing the program.
 #
-#
+#   Ver. pre-alpha :)
 
 
 import sys
@@ -276,6 +276,17 @@ def scheduleRCloneCmds( ):
             
                 sys.exit( )
 
+            fstr3 = "rclone"
+            fstr4 = "gDrive:UCI_HPC_Backup"
+
+            if fstr3 in pcmd and fstr4 in pcmd:
+
+                print "!!! Found running instances."
+            #print "!!! Found an already running instance of Cloud Backup with PID"\
+            #        " {0}.".format( pid )
+            
+                sys.exit( )
+
     print "-> No currently running Cloud Backup instances found." 
 
     nrclone = numNewLines( rclonecmdfl )
@@ -304,22 +315,15 @@ def scheduleRCloneCmds( ):
                                                     stdout = f,
                                                     stderr = f )
 
-                    #r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
-                    #result.wait( ) # exit all child processes when cloudBackup.py exists.
+"""
+                    r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
+                    result.wait( ) # exit all child processes when cloudBackup.py exists.
 
-                    # As is if stdout,stderr of a process is too big and I am not reading it, it is stored in buffer.  If the buffer is full or overloaded it can crash.  Use solution mentioned here: http://stackoverflow.com/questions/17190221/subprocess-popen-cloning-stdout-and-stderr-both-to-terminal-and-variables/25960956#25960956
-                    # Problem is described in detail here: http://stackoverflow.com/questions/36945580/redirect-the-output-of-multiple-parallel-processes-to-both-a-log-file-and-stdout
+                     As is if stdout,stderr of a process is too big and I am not reading it, it is stored in buffer.  If the buffer is full or overloaded it can crash.  Use solution mentioned here: http://stackoverflow.com/questions/17190221/subprocess-popen-cloning-stdout-and-stderr-both-to-terminal-and-variables/25960956#25960956
+                     Problem is described in detail here: http://stackoverflow.com/questions/36945580/redirect-the-output-of-multiple-parallel-processes-to-both-a-log-file-and-stdout
+"""
 
                     f.close( )
-
-                #fl.close( )
-                #print result
-
-    #rcInst = [ x.strip() for x in rcInst ]
-
-    #print rcInst(0)
-    #print rcInst(1)
-
 
 
 def main( ):
