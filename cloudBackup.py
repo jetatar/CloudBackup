@@ -8,9 +8,10 @@
 
 
 import sys
-import os.path
+import os
 import subprocess
 import psutil
+import daemon # https://pypi.python.org/pypi/python-daemon
 
 # Local configs
 basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
@@ -23,6 +24,8 @@ rclonecmdfl     = basedir + "/.hpc-cloud-backup-rclonecmd"
 
 # Remote configs
 remotebasedir = "UCI_HPC_Backup"
+
+THIS_PID = os.getpid( )
 
 #
 #   Don't want to start another CloudBackup/RClone process if there are any 
@@ -191,12 +194,19 @@ def prepExecStrings( ):
 
             # TODO: Check excludefl exists.
             # TODO: include --log-file 
-            cmd = [ "setsid rclone copy -vv {0} {1} --exclude-from {2} "\
+#            cmd = [ "setsid rclone copy -vv {0} {1} --exclude-from {2} "\
+#                        "--dump-filters --transfers=32 "\
+#                        "--checkers=16 --drive-chunk-size=16384k "\
+#                        "--drive-upload-cutoff=16384k --drive-use-trash "\
+#                        "&>/dev/null".format(src, dest, excludefl) \
+#                                        for (src, dest) in zip(spath, epath) ]
+            cmd = [ "/data/apps/rclone/1.35/bin/rclone copy -vv {0} {1} --exclude-from {2} "\
                         "--dump-filters --transfers=32 "\
                         "--checkers=16 --drive-chunk-size=16384k "\
-                        "--drive-upload-cutoff=16384k --drive-use-trash "\
-                        "&>/dev/null".format(src, dest, excludefl) \
+                        "--drive-upload-cutoff=16384k --drive-use-trash"\
+                        .format(src, dest, excludefl) \
                                         for (src, dest) in zip(spath, epath) ]
+
 
             with open(rclonecmdfl, "w") as cfl:
 
@@ -219,6 +229,98 @@ def prepExecStrings( ):
 
         sys.exit( )
 
+#
+#   Count number of lines in a file.
+#
+def numNewLines( fl ):
+
+    with open( fl, "r" ) as f:
+        
+        for i, l in enumerate(f):
+
+            pass
+
+        return i + 1
+
+    fl.close( )
+
+
+#
+#   Schedules and manages number of rclone commands to be run simultaneously.
+#
+def scheduleRCloneCmds( ):
+# See what's running
+# See how many there are total that need to run.
+# Run the next one.
+    
+    for pid in psutil.process_iter( ):
+
+        if pid.pid != THIS_PID:
+
+            try:
+                pcmd = pid.cmdline( )
+                pcmd = ' '.join( pcmd )
+
+            except( psutil.NoSuchProcess, psutil.AccessDenied ):
+                pass
+
+            fstr1 = "python"
+            fstr2 = "cloudBackup.py"
+            # TODO: This should be a while loop in order to print all already 
+            # running instances.
+            if fstr1 in pcmd and fstr2 in pcmd:
+
+                print "!!! Found running instances."
+            #print "!!! Found an already running instance of Cloud Backup with PID"\
+            #        " {0}.".format( pid )
+            
+                sys.exit( )
+
+    print "-> No currently running Cloud Backup instances found." 
+
+    nrclone = numNewLines( rclonecmdfl )
+
+    print "-> Number of RClone instances found: {0}".format( nrclone )
+    #print numNewLines( rclonecmdfl )
+
+    if nrclone:
+
+        with daemon.DaemonContext( ):
+
+            with open( rclonecmdfl ) as fl:
+        
+                for k, ln in enumerate(fl):
+
+                    print ln
+
+                    f   = open('/tmp/test{0}.txt'.format(k), "w")
+
+                    #result = subprocess.Popen( ln.split(" "),
+                    #                                stdout = subprocess.PIPE,
+                    #                                stderr = subprocess.PIPE )
+                    print ln.split(" ")
+                    cmdList = [ x.strip() for x in ln.split(" ") ]
+                    result = subprocess.Popen( cmdList,
+                                                    stdout = f,
+                                                    stderr = f )
+
+                    #r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
+                    #result.wait( ) # exit all child processes when cloudBackup.py exists.
+
+                    # As is if stdout,stderr of a process is too big and I am not reading it, it is stored in buffer.  If the buffer is full or overloaded it can crash.  Use solution mentioned here: http://stackoverflow.com/questions/17190221/subprocess-popen-cloning-stdout-and-stderr-both-to-terminal-and-variables/25960956#25960956
+                    # Problem is described in detail here: http://stackoverflow.com/questions/36945580/redirect-the-output-of-multiple-parallel-processes-to-both-a-log-file-and-stdout
+
+                    f.close( )
+
+                #fl.close( )
+                #print result
+
+    #rcInst = [ x.strip() for x in rcInst ]
+
+    #print rcInst(0)
+    #print rcInst(1)
+
+
 
 def main( ):
 
@@ -230,6 +332,7 @@ def main( ):
         # excludeSourcePaths
         # prepDestPaths
     prepExecStrings( )
+    scheduleRCloneCmds( )
 
 
 if __name__ == "__main__":
