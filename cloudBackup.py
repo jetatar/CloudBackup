@@ -9,9 +9,13 @@
 
 import sys
 import os
+import time
 import subprocess
 import psutil
 import daemon # https://pypi.python.org/pypi/python-daemon
+import daemon.pidfile
+import logging
+
 
 # Local configs
 basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
@@ -22,6 +26,9 @@ cleansourcefl   = basedir + "/.hpc-cloud-backup-clean"
 excludefl       = basedir + "/.hpc-cloud-backup-exclude"
 rclonecmdfl     = basedir + "/.hpc-cloud-backup-rclonecmd"
 
+dt              = 1 # time between backups (1 min after the first backup ends, the second will begin)
+
+
 # Remote configs
 remotebasedir = "UCI_HPC_Backup"
 
@@ -31,9 +38,32 @@ THIS_PID = os.getpid( )
 #   Don't want to start another CloudBackup/RClone process if there are any 
 #   already running.
 #
-def findRCloneInstances( ):
+def findRCloneInstances( pid = None, pname = "", pfl = "" ):
     
-    for pid in psutil.pids():
+    for pid in psutil.process_iter( ):
+
+        if pid.pid != THIS_PID:
+
+            try:
+                pcmd = pid.cmdline( )
+                pcmd = ' '.join( pcmd )
+
+            except( psutil.NoSuchProcess, psutil.AccessDenied ):
+                pass
+
+            if pname in pcmd:
+                print "!!! Found an already running instance of Cloud Backup with PID"\
+                    " {0}.".format( pid )
+            
+            #fl.write( "Found instance.\n" )    
+
+            sys.exit( )
+                
+
+    #with open( '/tmp/clouddebug.log', 'a' ) as fl:
+    #    fl.write( "Inside instaces.\n" )    
+    #fl.close( )
+    for pid in psutil.pids( ):
 
         p   = psutil.Process( pid ) 
         cmd = p.cmdline( )
@@ -44,8 +74,9 @@ def findRCloneInstances( ):
             print "!!! Found an already running instance of Cloud Backup with PID"\
                     " {0}.".format( pid )
             
-            sys.exit( )
+            #fl.write( "Found instance.\n" )    
 
+            sys.exit( )
 
 #
 #   Find RClone user configuration file.  The user should have gone through
@@ -264,8 +295,8 @@ def scheduleRCloneCmds( ):
             except( psutil.NoSuchProcess, psutil.AccessDenied ):
                 pass
 
-            fstr1 = "python"
-            fstr2 = "cloudBackup.py"
+            fstr1 = "rclone"
+            fstr2 = "defunct"
             # TODO: This should be a while loop in order to print all already 
             # running instances.
             if fstr1 in pcmd and fstr2 in pcmd:
@@ -296,24 +327,23 @@ def scheduleRCloneCmds( ):
 
     if nrclone:
 
-        with daemon.DaemonContext( ):
-
-            with open( rclonecmdfl ) as fl:
+        with open( rclonecmdfl ) as fl:
         
-                for k, ln in enumerate(fl):
+            for k, ln in enumerate(fl):
 
-                    print ln
+                print ln
 
-                    f   = open('/tmp/test{0}.txt'.format(k), "w")
+                f   = open('/tmp/test{0}.txt'.format(k), "w")
 
-                    #result = subprocess.Popen( ln.split(" "),
-                    #                                stdout = subprocess.PIPE,
-                    #                                stderr = subprocess.PIPE )
-                    print ln.split(" ")
-                    cmdList = [ x.strip() for x in ln.split(" ") ]
-                    result = subprocess.Popen( cmdList,
+                #result = subprocess.Popen( ln.split(" "),
+                #                                stdout = subprocess.PIPE,
+                #                                stderr = subprocess.PIPE )
+                print ln.split(" ")
+                cmdList = [ x.strip() for x in ln.split(" ") ]
+                result = subprocess.Popen( cmdList,
                                                     stdout = f,
                                                     stderr = f )
+
 
 """
                     r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
@@ -323,22 +353,39 @@ def scheduleRCloneCmds( ):
                      Problem is described in detail here: http://stackoverflow.com/questions/36945580/redirect-the-output-of-multiple-parallel-processes-to-both-a-log-file-and-stdout
 """
 
-                    f.close( )
-
 
 def main( ):
 
-    findRCloneInstances( )
-    findRCloneConfig( )
-    testRCloneConfig( )
-    prepPaths( )
-        # prepSourcePaths
-        # excludeSourcePaths
-        # prepDestPaths
-    prepExecStrings( )
-    scheduleRCloneCmds( )
+    logfl    = open( '/tmp/cloudLog.pid', 'a+' )
+    dcontext = daemon.DaemonContext( pidfile = daemon.pidfile.PIDLockFile('/tmp/cloudBackup.pid'), stdout = logfl, stderr = logfl, detach_process = True ) 
+
+    
+    with dcontext:
+
+        while True:
+
+            with open( '/tmp/clouddebug.log', 'a' ) as fl:
+                fl.write( "Determining rclone instances..\n" )
+                
+                findRCloneInstances( )
+
+                findRCloneInstances( )
+                findRCloneConfig( )
+                testRCloneConfig( )
+                prepPaths( )
+                    # prepSourcePaths
+                    # excludeSourcePaths
+                    # prepDestPaths
+                prepExecStrings( )
+                scheduleRCloneCmds( )
+
+                with open( '/tmp/clouddebug.log', 'a' ) as fl:
+                    fl.write( "Going to sleep\n" )
+                    fl.close( )
+
+                time.sleep( dt * 60 ) # minutes
 
 
 if __name__ == "__main__":
 
-    main( )
+        main( )
