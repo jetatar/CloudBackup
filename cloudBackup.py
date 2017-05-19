@@ -34,12 +34,32 @@ remotebasedir = "UCI_HPC_Backup"
 
 THIS_PID = os.getpid( )
 
+
+#
+#   Configure logging.
+#
+def confLogging( ):
+    
+    log     = logging.getLogger( __name__ )
+    log.setLevel( logging.INFO )
+    lfh     = logging.FileHandler( "/tmp/cloudBackup.log" )
+    lformat = logging.Formatter( 
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s' )
+    lfh.setFormatter( lformat )
+
+    log.addHandler( lfh )
+
+    log.info( "Configured Logging." )
+
+
 #
 #   Don't want to start another CloudBackup/RClone process if there are any 
 #   already running.
 #
 def findRCloneInstances( pid = None, pname = "", pfl = "" ):
     
+    log.info( "-> Checking for running RClone instances." )
+
     for pid in psutil.process_iter( ):
 
         if pid.pid != THIS_PID:
@@ -48,35 +68,23 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
                 pcmd = pid.cmdline( )
                 pcmd = ' '.join( pcmd )
 
-            except( psutil.NoSuchProcess, psutil.AccessDenied ):
+            except( psutil.NoSuchProcess, psutil.AccessDenied ) as err:
+
+                log.info( "Couldn't process pid commandline.  Error: %s", err )
+
                 pass
-
-            if pname in pcmd:
-                print "!!! Found an already running instance of Cloud Backup with PID"\
-                    " {0}.".format( pid )
-            
-            #fl.write( "Found instance.\n" )    
-
-            sys.exit( )
-                
-
-    #with open( '/tmp/clouddebug.log', 'a' ) as fl:
-    #    fl.write( "Inside instaces.\n" )    
-    #fl.close( )
-    for pid in psutil.pids( ):
-
-        p   = psutil.Process( pid ) 
-        cmd = p.cmdline( )
 
         # TODO: This should be a while loop in order to print all already running 
         # instances.
-        if 'python' in cmd and 'cBackup.py' in cmd:
-            print "!!! Found an already running instance of Cloud Backup with PID"\
-                    " {0}.".format( pid )
-            
-            #fl.write( "Found instance.\n" )    
+        #
+        #
+            if pname in pcmd:
 
-            sys.exit( )
+                log.info( "!!! Found a running instance of Cloud Backup with PID"\
+                            " {0}".format(pid) )
+
+                sys.exit( )
+
 
 #
 #   Find RClone user configuration file.  The user should have gone through
@@ -356,10 +364,11 @@ def scheduleRCloneCmds( ):
 
 def main( ):
 
+    log.info( "Staring daemon." )
+
     logfl    = open( '/tmp/cloudLog.pid', 'a+' )
     dcontext = daemon.DaemonContext( pidfile = daemon.pidfile.PIDLockFile('/tmp/cloudBackup.pid'), stdout = logfl, stderr = logfl, detach_process = True ) 
 
-    
     with dcontext:
 
         while True:
@@ -388,4 +397,5 @@ def main( ):
 
 if __name__ == "__main__":
 
-        main( )
+        confLogging( )
+        #main( )
