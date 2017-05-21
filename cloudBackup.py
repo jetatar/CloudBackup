@@ -15,6 +15,7 @@ import psutil
 import daemon # https://pypi.python.org/pypi/python-daemon
 import daemon.pidfile
 import logging
+import lockfile
 
 
 # Local configs
@@ -57,9 +58,12 @@ def confLogging( ):
 #   already running.
 #
 def findRCloneInstances( pid = None, pname = "", pfl = "" ):
-    
-    log.info( "-> Checking for running RClone instances." )
 
+    log     = logging.getLogger( __name__ )
+    
+    log.info( "Checking for existing RClone instances." )
+
+'''
     for pid in psutil.process_iter( ):
 
         if pid.pid != THIS_PID:
@@ -70,7 +74,7 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
 
             except( psutil.NoSuchProcess, psutil.AccessDenied ) as err:
 
-                log.info( "Couldn't process pid commandline.  Error: %s", err )
+                log.info( "!!! Couldn't process pid commandline.  Error: %s", err )
 
                 pass
 
@@ -78,13 +82,14 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
         # instances.
         #
         #
-            if pname in pcmd:
+
+            if pname and pname in pcmd:
 
                 log.info( "!!! Found a running instance of Cloud Backup with PID"\
-                            " {0}".format(pid) )
+                            " {0}".format(pid.read_pid()) )
 
                 sys.exit( )
-
+'''
 
 #
 #   Find RClone user configuration file.  The user should have gone through
@@ -95,8 +100,11 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
 #
 def findRCloneConfig( ):
 
+    log     = logging.getLogger( __name__ )
+
     if os.path.isfile(rconfdir):
-        print "-> Configuration file %s found." % rconfdir 
+
+        log.info( "Configuration file %s found." % rconfdir )
 
         if confname in open(rconfdir).read():
             print "-> Found %s configuration for UCI HPC Cloud backup." % confname
@@ -107,7 +115,7 @@ def findRCloneConfig( ):
             sys.exit( )
 
     else:
-        print "!!! RClone configuration file not found. :("
+        log.info( "!!! RClone configuration file not found. :(" )
 
         sys.exit( )
 
@@ -361,27 +369,67 @@ def scheduleRCloneCmds( ):
                      Problem is described in detail here: http://stackoverflow.com/questions/36945580/redirect-the-output-of-multiple-parallel-processes-to-both-a-log-file-and-stdout
 """
 
+#
+#   Get log file handlers so they can be kept open after daemonizing.  Otherwise
+#   logging to the log files stops.
+#
+def getLogFileHandles( log ):
+    
+    handles = [ ]
+
+    for handler in log.handlers:
+        
+        handles.append( handler.stream.fileno() )
+
+    if log.parent:
+        
+        handles += getLogFileHandles( log.parent )
+
+    return handles
+
+
 
 def main( ):
 
+    log     = logging.getLogger( __name__ )
     log.info( "Staring daemon." )
 
-    logfl    = open( '/tmp/cloudLog.pid', 'a+' )
-    dcontext = daemon.DaemonContext( pidfile = daemon.pidfile.PIDLockFile('/tmp/cloudBackup.pid'), stdout = logfl, stderr = logfl, detach_process = True ) 
+    pf      = daemon.pidfile.TimeoutPIDLockFile( '/tmp/cloudBackup.pid', -1 )
+
+    existing_pf = pf.read_pid( )
+
+    if existing_pf:
+
+        log.info( "!!! There is an already running instance with PID: %d. Exiting."\
+                                                            % (existing_pf) )
+
+        sys.exit( )
+
+
+    dcontext = daemon.DaemonContext( pidfile = pf, detach_process = True,\
+                files_preserve = getLogFileHandles(log) ) 
+    #dcontext = daemon.DaemonContext( pidfile = daemon.pidfile.PIDLockFile(
+    #            '/tmp/cloudBackup.pid'), detach_process = True,\
+    #            files_preserve = getLogFileHandles(log) ) 
+
+    log.info( "Detaching parent process." )
 
     with dcontext:
 
         while True:
 
-            with open( '/tmp/clouddebug.log', 'a' ) as fl:
-                fl.write( "Determining rclone instances..\n" )
+            #with open( '/tmp/clouddebug.log', 'a' ) as fl:
+            #    fl.write( "Determining rclone instances..\n" )
                 
-                findRCloneInstances( )
+            findRCloneInstances(  )
 
+            time.sleep( 5 )
+'''
                 findRCloneInstances( )
                 findRCloneConfig( )
                 testRCloneConfig( )
                 prepPaths( )
+
                     # prepSourcePaths
                     # excludeSourcePaths
                     # prepDestPaths
@@ -393,9 +441,9 @@ def main( ):
                     fl.close( )
 
                 time.sleep( dt * 60 ) # minutes
-
+'''
 
 if __name__ == "__main__":
 
         confLogging( )
-        #main( )
+        main( )
