@@ -63,7 +63,6 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
     
     log.info( "Checking for existing RClone instances." )
 
-'''
     for pid in psutil.process_iter( ):
 
         if pid.pid != THIS_PID:
@@ -74,7 +73,8 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
 
             except( psutil.NoSuchProcess, psutil.AccessDenied ) as err:
 
-                log.info( "!!! Couldn't process pid commandline.  Error: %s", err )
+                log.info( "!!! Couldn't process pid in running processes."\
+                                                            "Error: %s", err )
 
                 pass
 
@@ -83,13 +83,14 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
         #
         #
 
-            if pname and pname in pcmd:
+            if pname != None and pname in pcmd:
 
+                #log.info( "Exiting!" )
                 log.info( "!!! Found a running instance of Cloud Backup with PID"\
-                            " {0}".format(pid.read_pid()) )
+                            " {}".format(pid.pid) )
 
                 sys.exit( )
-'''
+
 
 #
 #   Find RClone user configuration file.  The user should have gone through
@@ -388,6 +389,16 @@ def getLogFileHandles( log ):
     return handles
 
 
+#
+#   Get command line for a specific process.
+#
+def getCmdByPID( pid ):
+
+    with open( "/proc/%d/cmdline" % pid ) as fl:
+
+        return fl.read( )
+
+
 
 def main( ):
 
@@ -400,11 +411,16 @@ def main( ):
 
     if existing_pf:
 
-        log.info( "!!! There is an already running instance with PID: %d. Exiting."\
-                                                            % (existing_pf) )
+        cmd = getCmdByPID( existing_pf )
 
-        sys.exit( )
+        if not cmd.strip():
+            pf.break_lock( )
 
+        else:
+            log.info( "!!! There is an already running instance with PID:"\
+                        "%d. Exiting." % existing_pf )
+
+            sys.exit( )
 
     dcontext = daemon.DaemonContext( pidfile = pf, detach_process = True,\
                 files_preserve = getLogFileHandles(log) ) 
@@ -421,7 +437,7 @@ def main( ):
             #with open( '/tmp/clouddebug.log', 'a' ) as fl:
             #    fl.write( "Determining rclone instances..\n" )
                 
-            findRCloneInstances(  )
+            findRCloneInstances( pname = "rclone" )
 
             time.sleep( 5 )
 '''
