@@ -33,7 +33,6 @@ dt              = 1 # time between backups (1 min after the first backup ends, t
 # Remote configs
 remotebasedir = "UCI_HPC_Backup"
 
-THIS_PID = os.getpid( )
 
 
 #
@@ -57,11 +56,12 @@ def confLogging( ):
 #   Don't want to start another CloudBackup/RClone process if there are any 
 #   already running.
 #
-def findRCloneInstances( pid = None, pname = "", pfl = "" ):
+def findRCloneInstances( pname = "" ):
 
-    log     = logging.getLogger( __name__ )
+    log         = logging.getLogger( __name__ )
+    THIS_PID    = os.getpid( )
     
-    log.info( "Checking for existing RClone instances." )
+    log.info( "Checking for existing Cloud Backup instances." )
 
     for pid in psutil.process_iter( ):
 
@@ -78,6 +78,39 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
 
                 pass
 
+            if not pname == "":
+
+                if pname in pcmd:
+
+                    log.info( "!!! Found a running instance of Cloud Backup with PID"\
+                            " {}.  This pid {}.  Cmdline: {}".format(pid.pid, THIS_PID, pid.cmdline()) )
+
+                    sys.exit( )
+
+
+def getRCloneInstances( pid = None, pname = "", pfl = "" ):
+
+    log         = logging.getLogger( __name__ )
+    THIS_PID    = os.getpid( )
+    runningPID  = []
+    
+    log.info( "Checking for existing RClone instances." )
+
+    for pid in psutil.process_iter( ):
+
+        if pid.pid != THIS_PID:
+
+            try:
+                pcmd = pid.cmdline( )
+                pcmd = ' '.join( pcmd )
+
+            except( psutil.NoSuchProcess, psutil.AccessDenied ) as err:
+
+                log.info( "!!! Couldn't find pid in running processes."\
+                                                            "Error: %s", err )
+
+                pass
+
         # TODO: This should be a while loop in order to print all already running 
         # instances.
         #
@@ -85,12 +118,12 @@ def findRCloneInstances( pid = None, pname = "", pfl = "" ):
 
             if pname != None and pname in pcmd:
 
-                #log.info( "Exiting!" )
-                log.info( "!!! Found a running instance of Cloud Backup with PID"\
+                runningPID = [ pid.pid ]
+
+                log.info( "!!! Found a running RClone instance of Cloud Backup with PID"\
                             " {}".format(pid.pid) )
 
-                sys.exit( )
-
+    return runningPID 
 
 #
 #   Find RClone user configuration file.  The user should have gone through
@@ -162,7 +195,9 @@ def testRCloneConfig( ):
 #   to Pcall()
 #
 def parseSourceFile( sourcefl ):
-    
+
+    log = logging.getLogger( __name__ )    
+
     cmd     = ( ['/usr/bin/dos2unix', str(sourcefl)] )
 
     result  = subprocess.Popen( cmd, shell = False )
@@ -170,7 +205,7 @@ def parseSourceFile( sourcefl ):
 
     if result.returncode != 0:
 
-        print "!!! Failed to parse {0}".format( sourcefl )
+        log.info( "!!! Failed to parse {0}".format(sourcefl) )
 
         sys.exit() 
 
@@ -310,67 +345,38 @@ def scheduleRCloneCmds( ):
 # See what's running
 # See how many there are total that need to run.
 # Run the next one.
-    
-    for pid in psutil.process_iter( ):
+    log = logging.getLogger( __name__ )
 
-        if pid.pid != THIS_PID:
+    rclonePID = getRCloneInstances( pname = "rclone" )
 
-            try:
-                pcmd = pid.cmdline( )
-                pcmd = ' '.join( pcmd )
+    #log.info( "RClone PID length: {}".format(rclonePID.len()) )
 
-            except( psutil.NoSuchProcess, psutil.AccessDenied ):
-                pass
-
-            fstr1 = "rclone"
-            fstr2 = "defunct"
-            # TODO: This should be a while loop in order to print all already 
-            # running instances.
-            if fstr1 in pcmd and fstr2 in pcmd:
-
-                print "!!! Found running instances."
-            #print "!!! Found an already running instance of Cloud Backup with PID"\
-            #        " {0}.".format( pid )
-            
-                sys.exit( )
-
-            fstr3 = "rclone"
-            fstr4 = "gDrive:UCI_HPC_Backup"
-
-            if fstr3 in pcmd and fstr4 in pcmd:
-
-                print "!!! Found running instances."
-            #print "!!! Found an already running instance of Cloud Backup with PID"\
-            #        " {0}.".format( pid )
-            
-                sys.exit( )
-
-    print "-> No currently running Cloud Backup instances found." 
-
-    nrclone = numNewLines( rclonecmdfl )
-
-    print "-> Number of RClone instances found: {0}".format( nrclone )
-    #print numNewLines( rclonecmdfl )
-
-    if nrclone:
-
-        with open( rclonecmdfl ) as fl:
+    if rclonePID != []:
         
-            for k, ln in enumerate(fl):
+        npids = len( rclonePID )
 
-                print ln
+        log.info( "Found {} running RClone instance(s).".format(npids) )
 
-                f   = open('/tmp/test{0}.txt'.format(k), "w")
+    else:
 
-                #result = subprocess.Popen( ln.split(" "),
-                #                                stdout = subprocess.PIPE,
-                #                                stderr = subprocess.PIPE )
-                print ln.split(" ")
-                cmdList = [ x.strip() for x in ln.split(" ") ]
-                result = subprocess.Popen( cmdList,
-                                                    stdout = f,
-                                                    stderr = f )
+        log.info( "Found no running RClone instances." )
 
+        nrclones = numNewLines( rclonecmdfl )
+
+        log.info( "Number of RClone commands to process: %d"%(nrclones) )
+
+        if nrclones > 0:
+
+            log.info( "Starting RClone sessions." )
+
+            with open( rclonecmdfl ) as fl:
+        
+                for k, ln in enumerate(fl):
+
+                    f       = open('/tmp/cloudtest{0}.txt'.format(k), "w")
+
+                    cmdList = [ x.strip() for x in ln.split(" ") ]
+                    result  = subprocess.Popen( cmdList, stdout = f, stderr = f )
 
 """
                     r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
@@ -439,9 +445,6 @@ def main( ):
 
     dcontext = daemon.DaemonContext( pidfile = pf, detach_process = True,\
                 files_preserve = getLogFileHandles(log) ) 
-    #dcontext = daemon.DaemonContext( pidfile = daemon.pidfile.PIDLockFile(
-    #            '/tmp/cloudBackup.pid'), detach_process = True,\
-    #            files_preserve = getLogFileHandles(log) ) 
 
     log.info( "Detaching parent process." )
 
@@ -449,24 +452,21 @@ def main( ):
 
         while True:
 
-            findRCloneInstances( pname = "rclone" )
+            findRCloneInstances( pname = "python cloudBackup.py" )
 
             findRCloneConfig( )
             testRCloneConfig( )
             prepPaths( )
             prepExecStrings( )
+            scheduleRCloneCmds( )
 
-            time.sleep( 5 )
+            time.sleep( 10 )
+
 '''
 
                     # prepSourcePaths
                     # excludeSourcePaths
                     # prepDestPaths
-                scheduleRCloneCmds( )
-
-                with open( '/tmp/clouddebug.log', 'a' ) as fl:
-                    fl.write( "Going to sleep\n" )
-                    fl.close( )
 
                 time.sleep( dt * 60 ) # minutes
 '''
