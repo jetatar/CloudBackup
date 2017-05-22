@@ -108,11 +108,12 @@ def findRCloneConfig( ):
         log.info( "Configuration file %s found." % rconfdir )
 
         if confname in open(rconfdir).read():
-            print "-> Found %s configuration for UCI HPC Cloud backup." % confname
+            log.info( "Found %s configuration for UCI HPC Cloud backup."\
+                                                                % confname )
 
         else:
-            print "!!! RClone configuration name %s for UCI HPC Cloud backup " \
-                                    "not found in %s" % (confname, rconfdir)
+            log.info( "!!! RClone configuration name %s for UCI HPC Cloud backup "\
+                                    "not found in %s" % (confname, rconfdir) )
             sys.exit( )
 
     else:
@@ -126,6 +127,8 @@ def findRCloneConfig( ):
 #
 def testRCloneConfig( ):
 
+    log             = logging.getLogger( __name__ )
+
     cmd             = ( ['rclone', 'lsd', str(confname)+":"] )
                                             #shell = True security hazard?
     result          = subprocess.Popen( cmd,    stdout = subprocess.PIPE, 
@@ -135,20 +138,20 @@ def testRCloneConfig( ):
 
     if result.returncode != 0:
         
-        print "!!! Command {0} failed with returncode {1}".format( cmd,\
-                                                                result.returncode )
+        log.info( "!!! Command {0} failed with returncode {1}".format(cmd,\
+                                                            result.returncode) )
 
         sys.exit( )
 
     if remotebasedir in dirs:
 
-        print "-> Backup base directory %s:%s found on remote." % (confname,\
-                                                                    remotebasedir)
+        log.info( "Backup base directory %s:%s found on remote." % (confname,\
+                                                                remotebasedir) )
 
     else:
         
-        print "!!! Cound't find base directory %s:%s on cloud." % (confname,\
-                                                                    remotebasedir)
+        log.info( "!!! Cound't find base directory %s:%s on cloud." % (confname,\
+                                                                remotebasedir) )
         sys.exit( )
 
 
@@ -193,6 +196,8 @@ def parseSourceFile( sourcefl ):
 #
 def prepPaths( ):
 
+    log = logging.getLogger( __name__ )
+
     if os.path.isfile(sourcefl):
         
         if os.stat(sourcefl).st_size > 0:
@@ -200,21 +205,22 @@ def prepPaths( ):
             parseSourceFile( sourcefl )
             #excludePaths( )
 
-            print "-> Found file {0} with paths to backup.".format( sourcefl )
+            log.info( "Found file {0} with paths to backup.".format(sourcefl) )
 
 
         else:
 
-            print "!!! File {0} is empty.  Nothing to backup!...".format( sourcefl )
+            log.info( "!!! File {0} is empty.  Nothing to backup!..."\
+                                                        .format(sourcefl) )
 
             sys.exit( )
 
 
     else:
         
-        print "!!! Couldn't find a file {0} containing paths for cloud backup. "\
-                " Please crete one so we know what needs to be backuped up."\
-                                                            .format( sourcefl )
+        log.info( "!!! Couldn't find a file {0} containing paths for cloud backup."\
+                    " Please crete one so we know what needs to be backuped up."\
+                                                            .format(sourcefl) )
 
         sys.exit( )
 
@@ -226,6 +232,8 @@ def prepPaths( ):
 #
 def prepExecStrings( ):
     
+    log = logging.getLogger( __name__ )
+
     if os.path.isfile(cleansourcefl):
         
         if os.stat(cleansourcefl).st_size > 0:
@@ -238,8 +246,6 @@ def prepExecStrings( ):
                 epath = [ "{0}:{1}{2}".format(confname, remotebasedir, sp)\
                                         for sp in spath ]
                 
-                fl.close( )
-
             # TODO: Check excludefl exists.
             # TODO: include --log-file 
 #            cmd = [ "setsid rclone copy -vv {0} {1} --exclude-from {2} "\
@@ -248,6 +254,9 @@ def prepExecStrings( ):
 #                        "--drive-upload-cutoff=16384k --drive-use-trash "\
 #                        "&>/dev/null".format(src, dest, excludefl) \
 #                                        for (src, dest) in zip(spath, epath) ]
+
+            log.info( "Generating final RClone command string." )
+
             cmd = [ "/data/apps/rclone/1.35/bin/rclone copy -vv {0} {1} --exclude-from {2} "\
                         "--dump-filters --transfers=32 "\
                         "--checkers=16 --drive-chunk-size=16384k "\
@@ -255,6 +264,7 @@ def prepExecStrings( ):
                         .format(src, dest, excludefl) \
                                         for (src, dest) in zip(spath, epath) ]
 
+            log.info( "{}".format(cmd) )
 
             with open(rclonecmdfl, "w") as cfl:
 
@@ -264,16 +274,16 @@ def prepExecStrings( ):
 
         else:
 
-            print "!!! Clean source file {0} is empty.  Nothing to backup!..."\
-                                                            .format( sourcefl )
+            log.info( "!!! Clean source file {0} is empty.  Nothing to backup!..."\
+                                                            .format(sourcefl) )
 
             sys.exit( )
 
             
     else:
 
-        print "!!! Couldn't find a cleaned source file {0}."\
-                                                            .format( cleansourcefl )
+        log.info( "!!! Couldn't find a cleaned source file {0}."\
+                                                            .format(cleansourcefl) )
 
         sys.exit( )
 
@@ -394,10 +404,15 @@ def getLogFileHandles( log ):
 #
 def getCmdByPID( pid ):
 
-    with open( "/proc/%d/cmdline" % pid ) as fl:
+    log = logging.getLogger( __name__ )
 
-        return fl.read( )
+    try:
+        with open( "/proc/%d/cmdline" % pid ) as fl:
+            return fl.read( )
 
+    except EnvironmentError as err:
+        log.info( "!!! Error finding process command line. Error: {}".format(err) )
+        return '' 
 
 
 def main( ):
@@ -434,22 +449,19 @@ def main( ):
 
         while True:
 
-            #with open( '/tmp/clouddebug.log', 'a' ) as fl:
-            #    fl.write( "Determining rclone instances..\n" )
-                
             findRCloneInstances( pname = "rclone" )
+
+            findRCloneConfig( )
+            testRCloneConfig( )
+            prepPaths( )
+            prepExecStrings( )
 
             time.sleep( 5 )
 '''
-                findRCloneInstances( )
-                findRCloneConfig( )
-                testRCloneConfig( )
-                prepPaths( )
 
                     # prepSourcePaths
                     # excludeSourcePaths
                     # prepDestPaths
-                prepExecStrings( )
                 scheduleRCloneCmds( )
 
                 with open( '/tmp/clouddebug.log', 'a' ) as fl:
