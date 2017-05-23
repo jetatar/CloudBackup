@@ -1,14 +1,13 @@
 #!/bin/env python
 
 #
-#   NEED TO FIX:
-#       Wait for psutil to return before continuing the program.
 #
 #   Ver. pre-alpha :)
 
 
 import sys
 import os
+import errno
 import time
 import subprocess
 import psutil
@@ -21,19 +20,24 @@ import argparse
 
 # Local configs
 basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
+clouddir        = basedir + "/.hpc_cloud_backup"
 rconfdir        = basedir + "/.config/rclone/rclone.conf"
 confname        = "gDrive"
-sourcefl        = basedir + "/.hpc-cloud-backup"
-cleansourcefl   = basedir + "/.hpc-cloud-backup-clean"
-excludefl       = basedir + "/.hpc-cloud-backup-exclude"
-rclonecmdfl     = basedir + "/.hpc-cloud-backup-rclonecmd"
+logdir          = clouddir + "/logs"
+logfl           = logdir + "/cloudbackup.log"
+sesslogdir      = logdir + "/sessions"
+cloudpidfl      = clouddir + "/cloudbackup.pid"
+
+sourcefl        = clouddir + "/.hpc-cloud-backup"
+cleansourcefl   = clouddir + "/.hpc-cloud-backup-clean"
+excludefl       = clouddir + "/.hpc-cloud-backup-exclude"
+rclonecmdfl     = clouddir + "/.hpc-cloud-backup-rclonecmd"
 
 dt              = 1 # time between backups (1 min after the first backup ends, the second will begin)
 
 
 # Remote configs
 remotebasedir = "UCI_HPC_Backup"
-
 
 
 #
@@ -43,7 +47,7 @@ def confLogging( ):
     
     log     = logging.getLogger( __name__ )
     log.setLevel( logging.INFO )
-    lfh     = logging.FileHandler( "/tmp/cloudBackup.log" )
+    lfh     = logging.FileHandler( logfl )
     lformat = logging.Formatter( 
                     '%(asctime)s - %(name)s - %(levelname)s - %(message)s' )
     lfh.setFormatter( lformat )
@@ -374,7 +378,8 @@ def scheduleRCloneCmds( ):
         
                 for k, ln in enumerate(fl):
 
-                    f       = open('/tmp/cloudtest{0}.txt'.format(k), "w")
+                    f       = open( sesslogdir + '/RCloneCmdLine_{0}.log'\
+                                                            .format(k), "w")
 
                     cmdList = [ x.strip() for x in ln.split(" ") ]
                     result  = subprocess.Popen( cmdList, stdout = f, stderr = f )
@@ -421,32 +426,55 @@ def getCmdByPID( pid ):
         log.info( "!!! Error finding process command line. Error: {}".format(err) )
         return '' 
 
-
+#
+#   Argument parser.
+#
 def parseOptions( args ):
 
     parser  = argparse.ArgumentParser( formatter_class =
                                         argparse.ArgumentDefaultsHelpFormatter )
 
     parser.add_argument( "-dt", "--delta_t",
-                        default = 1,
-                        help    = "Time, in minutes, between backup restarts." )
+                        default     = 1, 
+                        required    = False,
+                        help        = "Time, in minutes, between backup restarts." )
 
-    parser.add_argument( "-s", "--status" )
+    parser.add_argument( "--max-rc_sessions",
+                        default     = 2,
+                        required    = False,
+                        help        = "Maximum number of simultaneous RClone sessions." )
+
+    parser.add_argument( "status", nargs = '?' )
+
+    parser.add_argument( "qsub", nargs = '?' )
 
     return parser.parse_args()
 
 
+#
+#   Glue - put it all together.
+#
 def main( ):
 
     config  = parseOptions( sys.argv )
 
     log     = logging.getLogger( __name__ )
 
+    log.info( "Staring Cloud Backup." )
 
-    log.info( "Staring daemon." )
+    try:
+        os.makedirs( clouddir )
+        
+    except OSError as err:
 
-    pf      = daemon.pidfile.TimeoutPIDLockFile( '/tmp/cloudBackup.pid', -1 )
+        if err.errno != errno.EEXIST:
+            log.info( "!!! Error trying to create dir {}. Error thrown: {}"\
+                                                    .format(clouddir, err) )
 
+        else:
+            log.info( "Dir {} exists.".format(clouddir) )
+
+    pf          = daemon.pidfile.TimeoutPIDLockFile( cloudpidfl, -1 )
     existing_pf = pf.read_pid( )
 
     if existing_pf:
@@ -481,13 +509,7 @@ def main( ):
 
             time.sleep( 10 )
 
-'''
-
-                    # prepSourcePaths
-                    # excludeSourcePaths
-                    # prepDestPaths
-
-                time.sleep( dt * 60 ) # minutes
+            #time.sleep( dt * 60 ) # minutes
 '''
 
 if __name__ == "__main__":
