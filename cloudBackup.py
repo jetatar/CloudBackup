@@ -16,6 +16,7 @@ import daemon # https://pypi.python.org/pypi/python-daemon
 import daemon.pidfile
 import logging
 import lockfile
+import argparse
 
 
 # Local configs
@@ -421,9 +422,27 @@ def getCmdByPID( pid ):
         return '' 
 
 
+def parseOptions( args ):
+
+    parser  = argparse.ArgumentParser( formatter_class =
+                                        argparse.ArgumentDefaultsHelpFormatter )
+
+    parser.add_argument( "-dt", "--delta_t",
+                        default = 1,
+                        help    = "Time, in minutes, between backup restarts." )
+
+    parser.add_argument( "-s", "--status" )
+
+    return parser.parse_args()
+
+
 def main( ):
 
+    config  = parseOptions( sys.argv )
+
     log     = logging.getLogger( __name__ )
+
+
     log.info( "Staring daemon." )
 
     pf      = daemon.pidfile.TimeoutPIDLockFile( '/tmp/cloudBackup.pid', -1 )
