@@ -1,6 +1,6 @@
 #!/bin/env python
 
-#
+#   TODO: Add .exclude-clean as .backup-clean
 #
 #   Ver. pre-alpha :)
 
@@ -28,10 +28,10 @@ logfl           = logdir + "/cloudbackup.log"
 sesslogdir      = logdir + "/sessions"
 cloudpidfl      = clouddir + "/cloudbackup.pid"
 
-sourcefl        = clouddir + "/.hpc-cloud-backup"
-cleansourcefl   = clouddir + "/.hpc-cloud-backup-clean"
-excludefl       = clouddir + "/.hpc-cloud-backup-exclude"
-rclonecmdfl     = clouddir + "/.hpc-cloud-backup-rclonecmd"
+sourcefl        = clouddir + "/backup"
+cleansourcefl   = clouddir + "/.backup_clean"
+excludefl       = clouddir + "/exclude"
+rclonecmdfl     = clouddir + "/.backup_rclonecmd"
 
 dt              = 1 # time between backups (1 min after the first backup ends, the second will begin)
 
@@ -452,6 +452,26 @@ def parseOptions( args ):
 
 
 #
+#   Create dirs.
+#
+def mkdir( path ):
+
+    log = logging.getLogger( __name__ )
+
+    try:
+        os.makedirs( path )
+
+    except OSError as err:
+
+        if err.errno != errno.EEXIST:
+            log.info( "!!! Error trying to create dir {}. Error thrown: {}"\
+                        " ... exiting ...".format(path, err) )
+
+        else:
+            log.info( "Dir {} exists.".format(path) )
+
+
+#
 #   Glue - put it all together.
 #
 def main( ):
@@ -462,17 +482,9 @@ def main( ):
 
     log.info( "Staring Cloud Backup." )
 
-    try:
-        os.makedirs( clouddir )
-        
-    except OSError as err:
-
-        if err.errno != errno.EEXIST:
-            log.info( "!!! Error trying to create dir {}. Error thrown: {}"\
-                                                    .format(clouddir, err) )
-
-        else:
-            log.info( "Dir {} exists.".format(clouddir) )
+    mkdir( clouddir )
+    mkdir( logdir )
+    mkdir( sesslogdir )
 
     pf          = daemon.pidfile.TimeoutPIDLockFile( cloudpidfl, -1 )
     existing_pf = pf.read_pid( )
@@ -510,7 +522,6 @@ def main( ):
             time.sleep( 10 )
 
             #time.sleep( dt * 60 ) # minutes
-'''
 
 if __name__ == "__main__":
 
