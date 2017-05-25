@@ -167,7 +167,8 @@ def testRCloneConfig( ):
 
     log             = logging.getLogger( __name__ )
 
-    cmd             = ( ['rclone', 'lsd', str(confname)+":"] )
+    cmd             = ( ['/data/apps/rclone/1.35/bin/rclone', 'lsd',
+                                                            str(confname)+":"] )
                                             #shell = True security hazard?
     result          = subprocess.Popen( cmd,    stdout = subprocess.PIPE, 
                                                 stderr = subprocess.PIPE,
@@ -360,8 +361,21 @@ def flLineToList( fl ):
 #
 #   Submit RClone cmd by line number of file rclonecmdfl set to.
 #
-def subRCloneProc( proc, linenum ):
+def subRCProc( proc, linenum ):
 
+    log = logging.getLogger( __name__ )
+
+    cmdList = [ p for p in proc.split(" ") ]
+    
+    fl = open( sesslogdir + "/RCloneCmdLine_{}.log".format(linenum), "w" )
+
+    result  = subprocess.Popen( cmdList, stdout = fl, stderr = fl )
+
+    log.info( "Initiating RClone session with PID {}".format(result.pid) )
+
+    return result
+
+'''
             with open( rclonecmdfl ) as fl:
         
                 for k, ln in enumerate(fl):
@@ -374,7 +388,7 @@ def subRCloneProc( proc, linenum ):
 
                     log.info( "Initiating RClone session with PID {}"\
                                                         .format(result.pid) )
-
+'''
 
 #
 #   Schedules and manages number of rclone commands to be run simultaneously.
@@ -397,7 +411,7 @@ def scheduleRCloneCmds( max_sess ):
 
         #nrclones = numNewLines( rclonecmdfl )
         procs    = flLineToList( rclonecmdfl )
-        nprocs   = len( proc )
+        nprocs   = len( procs )
 
         log.info( "Number of RClone commands to process: %d" % (nprocs) )
 
@@ -406,21 +420,29 @@ def scheduleRCloneCmds( max_sess ):
             log.info( "Starting RClone sessions." )
 
             runningps = { }  # Dictionary of RClone processes with key = PID
+            max_running = min( nprocs, max_sess )
+
+            for (i, p) in enumerate(procs):
+                
+                while len(runningps) < max_running:
+
+                    ps                  = subRCProc( p, i )
+
 
             for i in range( nprocs ):
 
-                while len(runningps) < max_sess:
+                while len(runningps) < max_running:
 
-                    ps                  = subRCloneProc( procs[i], i )
+                    ps                  = subRCProc( procs[i], i )
                     runningps[ps.pid]   = ps
 
                     i += 1
 
-                while len(runningps) == max_sess:
+                while len(runningps) == max_running:
 
                     i -= 1
                     log.info( "Max sessions (%d) open. "\
-                                "Waiting for a session to end." % max_sess )
+                                "Waiting for a session to end." % max_running )
                     (pid, status) = os.wait( )
                     runningps     = runningps.pop( pid )
                     log.info( "RCLone session with PID {} ended with status {}"\
