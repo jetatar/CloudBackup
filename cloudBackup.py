@@ -87,8 +87,9 @@ def findRCloneInstances( pname = "" ):
 
                 if pname in pcmd:
 
-                    log.info( "!!! Found a running instance of Cloud Backup with PID"\
-                            " {}.  This pid {}.  Cmdline: {}".format(pid.pid, THIS_PID, pid.cmdline()) )
+                    log.info( "!!! Found a running instance of Cloud Backup"\ 
+                                " with PID {}.  This pid {}.  Cmdline: {}"\
+                                    .format(pid.pid, THIS_PID, pid.cmdline()) )
 
                     sys.exit( )
 
@@ -125,8 +126,8 @@ def getRCloneInstances( pid = None, pname = "", pfl = "" ):
 
                 runningPID = [ pid.pid ]
 
-                log.info( "!!! Found a running RClone instance of Cloud Backup with PID"\
-                            " {}".format(pid.pid) )
+                log.info( "!!! Found a running RClone instance of Cloud Backup"
+                            " with PID {}".format(pid.pid) )
 
     return runningPID 
 
@@ -289,16 +290,11 @@ def prepExecStrings( ):
                 
             # TODO: Check excludefl exists.
             # TODO: include --log-file 
-#            cmd = [ "setsid rclone copy -vv {0} {1} --exclude-from {2} "\
-#                        "--dump-filters --transfers=32 "\
-#                        "--checkers=16 --drive-chunk-size=16384k "\
-#                        "--drive-upload-cutoff=16384k --drive-use-trash "\
-#                        "&>/dev/null".format(src, dest, excludefl) \
-#                                        for (src, dest) in zip(spath, epath) ]
 
             log.info( "Generating final RClone command string." )
 
-            cmd = [ "/data/apps/rclone/1.35/bin/rclone copy -vv {0} {1} --exclude-from {2} "\
+            cmd = [ "/data/apps/rclone/1.35/bin/rclone copy -vv {0} {1}"\
+                        " --exclude-from {2} "\
                         "--dump-filters --transfers=32 "\
                         "--checkers=16 --drive-chunk-size=16384k "\
                         "--drive-upload-cutoff=16384k --drive-use-trash"\
@@ -329,7 +325,7 @@ def prepExecStrings( ):
         sys.exit( )
 
 #
-#   Count number of lines in a file.
+#   Count number of lines in a file.  (UNUSED)
 #
 def numNewLines( fl ):
 
@@ -375,20 +371,6 @@ def subRCProc( proc, linenum ):
 
     return result
 
-'''
-            with open( rclonecmdfl ) as fl:
-        
-                for k, ln in enumerate(fl):
-
-                    f       = open( sesslogdir + '/RCloneCmdLine_{0}.log'\
-                                                            .format(k), "w")
-
-                    cmdList = [ x.strip() for x in ln.split(" ") ]
-                    result  = subprocess.Popen( cmdList, stdout = f, stderr = f )
-
-                    log.info( "Initiating RClone session with PID {}"\
-                                                        .format(result.pid) )
-'''
 
 #
 #   Schedules and manages number of rclone commands to be run simultaneously.
@@ -420,13 +402,15 @@ def scheduleRCloneCmds( max_sess ):
 
         while len(procs) > 0:
         
-            max_running = min( len(procs), max_sess )
+            #max_running = min( len(procs), max_sess )
 
             log.info( "Max # of simultaneous RClone sessions: {}"\
-                                                    .format(max_running) )
+                                                    .format(max_sess) )
 
-            log.info( "{}".format(runningps, max_running) )
-            if len(runningps) < max_running:
+            log.info( "{}, {}, {}".format(len(runningps), max_sess, ln) )
+
+            #if len(runningps) < max_running:
+            if len(runningps) < max_sess:
 
                 log.info( "Starting command line # {}".format(ln) )
                 ps                  = subRCProc( procs.popleft(), ln )
@@ -436,49 +420,13 @@ def scheduleRCloneCmds( max_sess ):
             else:
 
                 log.info( "Max sessions (%d) open. "\
-                            "Waiting for a session to end." % max_running )
+                            "Waiting for a session to end." % max_sess )
                 (pid, status) = os.wait( )
                 runningps.pop( pid )
                 log.info( "RCLone session with PID {} ended with status {}"\
                                                             .format(pid, status) )
 
     log.info( "All done!  Going to sleep." )
-
-'''
-        if nprocs > 0:
-
-            log.info( "Starting RClone sessions." )
-
-            runningps = { }  # Dictionary of RClone processes with key = PID
-            max_running = min( nprocs, max_sess )
-
-            for (i, p) in enumerate(procs):
-                
-                while len(runningps) < max_running:
-
-                    ps                  = subRCProc( p, i )
-
-
-            for i in range( nprocs ):
-
-                while len(runningps) < max_running:
-
-                    ps                  = subRCProc( procs[i], i )
-                    runningps[ps.pid]   = ps
-
-                    i += 1
-
-                while len(runningps) == max_running:
-
-                    i -= 1
-                    log.info( "Max sessions (%d) open. "\
-                                "Waiting for a session to end." % max_running )
-                    (pid, status) = os.wait( )
-                    runningps     = runningps.pop( pid )
-                    log.info( "RCLone session with PID {} ended with status {}"\
-                                                            .format(pid, status) )
-'''
-
 
 """
                     r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
@@ -627,9 +575,9 @@ def main( ):
             prepExecStrings( )
             scheduleRCloneCmds( config.max_sess )
 
-            time.sleep( 10 )
+            #time.sleep( 10 )
 
-            #time.sleep( config.dt * 60 ) # minutes
+            time.sleep( config.dt * 60 ) # minutes
 
 if __name__ == "__main__":
 
