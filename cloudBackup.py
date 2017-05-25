@@ -16,7 +16,7 @@ import daemon.pidfile
 import logging
 import lockfile
 import argparse
-
+from collections import deque
 
 # Local configs
 basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
@@ -410,11 +410,41 @@ def scheduleRCloneCmds( max_sess ):
         log.info( "Found no running RClone instances." )
 
         #nrclones = numNewLines( rclonecmdfl )
-        procs    = flLineToList( rclonecmdfl )
+        procs    = deque( flLineToList(rclonecmdfl) )
         nprocs   = len( procs )
 
         log.info( "Number of RClone commands to process: %d" % (nprocs) )
 
+        ln          = 0 # cmd line counter
+        runningps   = { }
+
+        while len(procs) > 0:
+        
+            max_running = min( len(procs), max_sess )
+
+            log.info( "Max # of simultaneous RClone sessions: {}"\
+                                                    .format(max_running) )
+
+            log.info( "{}".format(runningps, max_running) )
+            if len(runningps) < max_running:
+
+                log.info( "Starting command line # {}".format(ln) )
+                ps                  = subRCProc( procs.popleft(), ln )
+                runningps[ps.pid]   = ps
+                ln += 1
+
+            else:
+
+                log.info( "Max sessions (%d) open. "\
+                            "Waiting for a session to end." % max_running )
+                (pid, status) = os.wait( )
+                runningps.pop( pid )
+                log.info( "RCLone session with PID {} ended with status {}"\
+                                                            .format(pid, status) )
+
+    log.info( "All done!  Going to sleep." )
+
+'''
         if nprocs > 0:
 
             log.info( "Starting RClone sessions." )
@@ -447,8 +477,8 @@ def scheduleRCloneCmds( max_sess ):
                     runningps     = runningps.pop( pid )
                     log.info( "RCLone session with PID {} ended with status {}"\
                                                             .format(pid, status) )
+'''
 
-            log.info( "All done!  Going to sleep." )
 
 """
                     r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
