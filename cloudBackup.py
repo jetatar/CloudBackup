@@ -343,18 +343,36 @@ def numNewLines( fl ):
     fl.close( )
 
 
+
+#
+#   Submit RClone cmd by line number of file rclonecmdfl set to.
+#
+def subRCloneProc( line ):
+
+            with open( rclonecmdfl ) as fl:
+        
+                for k, ln in enumerate(fl):
+
+                    f       = open( sesslogdir + '/RCloneCmdLine_{0}.log'\
+                                                            .format(k), "w")
+
+                    cmdList = [ x.strip() for x in ln.split(" ") ]
+                    result  = subprocess.Popen( cmdList, stdout = f, stderr = f )
+
+                    log.info( "Initiating RClone session with PID {}"\
+                                                        .format(result.pid) )
+
+
 #
 #   Schedules and manages number of rclone commands to be run simultaneously.
 #
-def scheduleRCloneCmds( ):
+def scheduleRCloneCmds( max_sess ):
 # See what's running
 # See how many there are total that need to run.
 # Run the next one.
     log = logging.getLogger( __name__ )
 
     rclonePID = getRCloneInstances( pname = "rclone" )
-
-    #log.info( "RClone PID length: {}".format(rclonePID.len()) )
 
     if rclonePID != []:
         
@@ -368,21 +386,50 @@ def scheduleRCloneCmds( ):
 
         nrclones = numNewLines( rclonecmdfl )
 
-        log.info( "Number of RClone commands to process: %d"%(nrclones) )
+        log.info( "Number of RClone commands to process: %d" % (nrclones) )
 
         if nrclones > 0:
 
             log.info( "Starting RClone sessions." )
 
-            with open( rclonecmdfl ) as fl:
-        
-                for k, ln in enumerate(fl):
+            rcps = { }  # Dictionary of RClone processes with key = PID
 
-                    f       = open( sesslogdir + '/RCloneCmdLine_{0}.log'\
-                                                            .format(k), "w")
+            max_sess
+            tot_num_rclone_lines
+            rclone_line_to_execute
+            last_rclone_line_executed = 0
 
-                    cmdList = [ x.strip() for x in ln.split(" ") ]
-                    result  = subprocess.Popen( cmdList, stdout = f, stderr = f )
+            for last_rclone_line_executed in range(tot_num_rclone_lines):
+
+                while len(rcps) < max_sess:
+
+                    proc            = subRCloneProc( last_rclone_line_executed )
+                    rcps[proc.pid]  = proc
+                    last_rclone_line_executed = last_rclone_line_executed + 1
+
+                while len(rcps) == max_sess:
+
+                    last_rclone_line_executed = last_rclone_line_executed - 1
+                    log.info( "Max sessions (%d) open.  Waiting for a session to end." % max_sess )
+                    (pid, status)   = os.wait( )
+                    rcps            = rcps.pop( pid )
+                    log.info( "Session with PID {} ended with status {}"\
+                                                            .format(pid, status) )
+
+            log.info( "All done!  Going to sleep." )
+
+
+                    rcpids.add( result.pid )
+
+                    while rcpids:
+
+                        (done_pid, retval) = os.wait( )
+
+                        log.info( "RClone PID {p} finished with retval: {rv}"\
+                                    .format(p = done_pid, rv = retval) )
+
+                        rcpids.remove( done_pid )
+
 
 """
                     r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
@@ -435,18 +482,22 @@ def parseOptions( args ):
                                         argparse.ArgumentDefaultsHelpFormatter )
 
     parser.add_argument( "-dt", "--delta_t",
+                        type        = int,
+                        dest        = "dt",
                         default     = 1, 
                         required    = False,
                         help        = "Time, in minutes, between backup restarts." )
 
     parser.add_argument( "--max-rc_sessions",
+                        type        = int,
+                        dest        = "max_sess",
                         default     = 2,
                         required    = False,
                         help        = "Maximum number of simultaneous RClone sessions." )
 
-    parser.add_argument( "status", nargs = '?' )
+    #parser.add_argument( "status", nargs = '?' )
 
-    parser.add_argument( "qsub", nargs = '?' )
+    #parser.add_argument( "qsub", nargs = '?' )
 
     return parser.parse_args()
 
@@ -476,15 +527,23 @@ def mkdir( path ):
 #
 def main( ):
 
+    # Setup base dirs.  Can't use mkdir() it uses logger, but log dir not created.
+    try:
+        os.makedirs( clouddir )
+        os.makedirs( logdir )
+
+    except OSError: # If dir exists, pass.
+        pass
+
+    mkdir( sesslogdir )
+
+    confLogging( )
+
     config  = parseOptions( sys.argv )
 
     log     = logging.getLogger( __name__ )
 
     log.info( "Staring Cloud Backup." )
-
-    mkdir( clouddir )
-    mkdir( logdir )
-    mkdir( sesslogdir )
 
     pf          = daemon.pidfile.TimeoutPIDLockFile( cloudpidfl, -1 )
     existing_pf = pf.read_pid( )
@@ -517,13 +576,12 @@ def main( ):
             testRCloneConfig( )
             prepPaths( )
             prepExecStrings( )
-            scheduleRCloneCmds( )
+            scheduleRCloneCmds( config.max_sess )
 
             time.sleep( 10 )
 
-            #time.sleep( dt * 60 ) # minutes
+            #time.sleep( config.dt * 60 ) # minutes
 
 if __name__ == "__main__":
 
-        confLogging( )
         main( )
