@@ -343,11 +343,24 @@ def numNewLines( fl ):
     fl.close( )
 
 
+#
+#   Given a file, return a list with file lines as elements
+#
+def flLineToList( fl ):
+
+    lst = []    
+
+    with open( fl, "r" ) as fl:
+
+        lst = fl.read().splitlines()
+        
+    return lst
+
 
 #
 #   Submit RClone cmd by line number of file rclonecmdfl set to.
 #
-def subRCloneProc( line ):
+def subRCloneProc( proc, linenum ):
 
             with open( rclonecmdfl ) as fl:
         
@@ -367,9 +380,7 @@ def subRCloneProc( line ):
 #   Schedules and manages number of rclone commands to be run simultaneously.
 #
 def scheduleRCloneCmds( max_sess ):
-# See what's running
-# See how many there are total that need to run.
-# Run the next one.
+
     log = logging.getLogger( __name__ )
 
     rclonePID = getRCloneInstances( pname = "rclone" )
@@ -384,52 +395,38 @@ def scheduleRCloneCmds( max_sess ):
 
         log.info( "Found no running RClone instances." )
 
-        nrclones = numNewLines( rclonecmdfl )
+        #nrclones = numNewLines( rclonecmdfl )
+        procs    = flLineToList( rclonecmdfl )
+        nprocs   = len( proc )
 
-        log.info( "Number of RClone commands to process: %d" % (nrclones) )
+        log.info( "Number of RClone commands to process: %d" % (nprocs) )
 
-        if nrclones > 0:
+        if nprocs > 0:
 
             log.info( "Starting RClone sessions." )
 
-            rcps = { }  # Dictionary of RClone processes with key = PID
+            runningps = { }  # Dictionary of RClone processes with key = PID
 
-            max_sess
-            tot_num_rclone_lines
-            rclone_line_to_execute
-            last_rclone_line_executed = 0
+            for i in range( nprocs ):
 
-            for last_rclone_line_executed in range(tot_num_rclone_lines):
+                while len(runningps) < max_sess:
 
-                while len(rcps) < max_sess:
+                    ps                  = subRCloneProc( procs[i], i )
+                    runningps[ps.pid]   = ps
 
-                    proc            = subRCloneProc( last_rclone_line_executed )
-                    rcps[proc.pid]  = proc
-                    last_rclone_line_executed = last_rclone_line_executed + 1
+                    i += 1
 
-                while len(rcps) == max_sess:
+                while len(runningps) == max_sess:
 
-                    last_rclone_line_executed = last_rclone_line_executed - 1
-                    log.info( "Max sessions (%d) open.  Waiting for a session to end." % max_sess )
-                    (pid, status)   = os.wait( )
-                    rcps            = rcps.pop( pid )
-                    log.info( "Session with PID {} ended with status {}"\
+                    i -= 1
+                    log.info( "Max sessions (%d) open. "\
+                                "Waiting for a session to end." % max_sess )
+                    (pid, status) = os.wait( )
+                    runningps     = runningps.pop( pid )
+                    log.info( "RCLone session with PID {} ended with status {}"\
                                                             .format(pid, status) )
 
             log.info( "All done!  Going to sleep." )
-
-
-                    rcpids.add( result.pid )
-
-                    while rcpids:
-
-                        (done_pid, retval) = os.wait( )
-
-                        log.info( "RClone PID {p} finished with retval: {rv}"\
-                                    .format(p = done_pid, rv = retval) )
-
-                        rcpids.remove( done_pid )
-
 
 """
                     r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
