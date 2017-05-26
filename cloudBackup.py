@@ -20,7 +20,9 @@ import argparse
 from collections import deque
 
 # Local configs
-basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
+
+basedir         = os.path.expanduser( "~" )
+#basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
 clouddir        = basedir + "/.hpc_cloud_backup"
 rconfdir        = basedir + "/.config/rclone/rclone.conf"
 confname        = "gDrive"
