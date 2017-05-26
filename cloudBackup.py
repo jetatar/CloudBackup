@@ -7,6 +7,7 @@
 
 import sys
 import os
+import signal
 import errno
 import time
 import subprocess
@@ -33,7 +34,7 @@ cleansourcefl   = clouddir + "/.backup_clean"
 excludefl       = clouddir + "/exclude"
 rclonecmdfl     = clouddir + "/.backup_rclonecmd"
 
-dt              = 1 # time between backups (1 min after the first backup ends, the second will begin)
+#dt              = 1 # time between backups (1 min after the first backup ends, the second will begin)
 
 
 # Remote configs
@@ -87,7 +88,7 @@ def findRCloneInstances( pname = "" ):
 
                 if pname in pcmd:
 
-                    log.info( "!!! Found a running instance of Cloud Backup"\ 
+                    log.info( "!!! Found a running instance of Cloud Backup"\
                                 " with PID {}.  This pid {}.  Cmdline: {}"\
                                     .format(pid.pid, THIS_PID, pid.cmdline()) )
 
@@ -426,7 +427,7 @@ def scheduleRCloneCmds( max_sess ):
                 log.info( "RCLone session with PID {} ended with status {}"\
                                                             .format(pid, status) )
 
-    log.info( "All done!  Going to sleep." )
+    #log.info( "All done!  Going to sleep." )
 
 """
                     r, e = result.communicate( )  # This calls communicate on first running process and doesn't return until the first process finishes.
@@ -481,7 +482,7 @@ def parseOptions( args ):
     parser.add_argument( "-dt", "--delta_t",
                         type        = int,
                         dest        = "dt",
-                        default     = 1, 
+                        default     = 60,
                         required    = False,
                         help        = "Time, in minutes, between backup restarts." )
 
@@ -490,7 +491,11 @@ def parseOptions( args ):
                         dest        = "max_sess",
                         default     = 2,
                         required    = False,
-                        help        = "Maximum number of simultaneous RClone sessions." )
+                        help        = "Maximum number of simultaneous RClone sessions.  DO NOT EXCEED 2 (FOR NOW)" )
+
+    parser.add_argument( "stop",
+                        nargs       = '?',
+                        help        = "Stop backup" )
 
     #parser.add_argument( "status", nargs = '?' )
 
@@ -520,6 +525,23 @@ def mkdir( path ):
 
 
 #
+#   Implementation of "cloudBackup.py stop" -- kill running cloudBackup.
+#
+def killCloudBackup( pidfl ):
+
+    log = logging.getLogger( __name__ )
+
+    pid = daemon.pidfile.TimeoutPIDLockFile(pidfl, -1).read_pid( )
+    pid = int( pid )
+
+    if pid:
+
+        log.info( "Killing cloudBackup with pid: {}".format(pid) )
+        os.kill( pid, signal.SIGTERM )
+
+        sys.exit( )
+
+#
 #   Glue - put it all together.
 #
 def main( ):
@@ -535,10 +557,15 @@ def main( ):
     mkdir( sesslogdir )
 
     confLogging( )
+    log     = logging.getLogger( __name__ )
 
     config  = parseOptions( sys.argv )
 
-    log     = logging.getLogger( __name__ )
+    if config.stop == "stop":
+
+        killCloudBackup( cloudpidfl )
+        sys.exit( )
+
 
     log.info( "Staring Cloud Backup." )
 
@@ -576,8 +603,17 @@ def main( ):
             scheduleRCloneCmds( config.max_sess )
 
             #time.sleep( 10 )
+            if config.dt > 0:
 
-            time.sleep( config.dt * 60 ) # minutes
+                log.info( "All done!  Going to sleep for {} min."\
+                                                            .format(config.dt) )
+                time.sleep( config.dt * 60 ) # minutes
+            else:
+                
+                log.info( "ciao ciao" )
+                sys.exit( )
+
+
 
 if __name__ == "__main__":
 
