@@ -17,6 +17,7 @@ import daemon.pidfile
 import logging
 import lockfile
 import argparse
+import ConfigParser
 from collections import deque
 
 # Local configs
@@ -478,22 +479,52 @@ def getCmdByPID( pid ):
 #
 def parseOptions( args ):
 
-    parser  = argparse.ArgumentParser( formatter_class =
-                                        argparse.ArgumentDefaultsHelpFormatter )
+    # config file parser (PARENT) 
+    # Turn off -h/help in parent parser, so it doesn't print options twice (child)
+    # the --config_file option has to be parsed first, if we want to be able to
+    # overwrite config file options from command line.
+    cnparser  = argparse.ArgumentParser(
+                description = __doc__,
+                formatter_class = argparse.ArgumentDefaultsHelpFormatter,
+                add_help = False ) 
+
+    cnparser.add_argument( "-c", "--conf_file",
+                        dest        = "configfl",
+                        required    = False,
+                        help        = "Specify config file to use.",
+                        metavar     = "FILE" )
+
+    args, rem_args = parser.parse_known_args( ) # default taken from sys.argv[1:]
+
+    defaults = {    "dt"        : 60,
+                    "max_sess"  : 2 }
+
+    if args.conf_file:
+
+        config = ConfigParser.SafeConfigParser( )
+        config.read( [args.conf_file] )
+        defaults.update( dict(config.items("defaults")) )
+
+
+    # Create a child parser that inherits options from parents.
+    # Not suppressing help here, so -h/--help will work.
+    parser  = argparse.ArgumentParser( parents = [cnparser] )
+
+    parser.set_defaults( **defaults )
 
     parser.add_argument( "-dt", "--delta_t",
                         type        = int,
                         dest        = "dt",
-                        default     = 60,
                         required    = False,
-                        help        = "Time, in minutes, between backup restarts." )
+                        help        = "Time, in minutes, between backup restarts.",
+                        metavar     = "NUMBER" )
 
-    parser.add_argument( "--max-rc_sessions",
+    parser.add_argument( "--max_sess",
                         type        = int,
                         dest        = "max_sess",
-                        default     = 2,
                         required    = False,
-                        help        = "Maximum number of simultaneous RClone sessions.  DO NOT EXCEED 2 (FOR NOW)" )
+                        help        = "Maximum number of simultaneous RClone sessions.  DO NOT EXCEED 2 (FOR NOW)",
+                        metavar     = "NUMBER" )
 
     parser.add_argument( "stop",
                         nargs       = '?',
@@ -503,7 +534,7 @@ def parseOptions( args ):
 
     #parser.add_argument( "qsub", nargs = '?' )
 
-    return parser.parse_args()
+    return parser.parse_args( rem_args )
 
 
 #
@@ -546,7 +577,10 @@ def killCloudBackup( pidfl ):
 #
 #   Glue - put it all together.
 #
-def main( ):
+def main( argv = None ):
+
+    if argv is None:
+        argv = sys.argv
 
     # Setup base dirs.  Can't use mkdir() it uses logger, but log dir not created.
     try:
@@ -564,7 +598,7 @@ def main( ):
     log     = logging.getLogger( __name__ )
 
     # Configure option parsing
-    config  = parseOptions( sys.argv )
+    config  = parseOptions( argv )
 
     if config.stop == "stop":
 
