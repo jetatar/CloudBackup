@@ -556,24 +556,33 @@ def main( ):
     except OSError: # If dir exists, pass.
         pass
 
+    # Create RClone logs for each initiated RClone instance.
     mkdir( sesslogdir )
 
+    # Configure Logging
     confLogging( )
     log     = logging.getLogger( __name__ )
 
+    # Configure option parsing
     config  = parseOptions( sys.argv )
 
     if config.stop == "stop":
+
+        print "-> Stopping Cloud Backup..."
 
         killCloudBackup( cloudpidfl )
         sys.exit( )
 
 
+    print "-> Staring Cloud Backup...\n  Check {} for status.".format( logfl )
     log.info( "Staring Cloud Backup." )
 
+
+    # Daemonize.  From here on, stderr, stdout are redirected to log files.
     pf          = daemon.pidfile.TimeoutPIDLockFile( cloudpidfl, -1 )
     existing_pf = pf.read_pid( )
 
+    # Check for previously existing Cloud Backup processes.
     if existing_pf:
 
         cmd = getCmdByPID( existing_pf )
@@ -592,18 +601,29 @@ def main( ):
 
     log.info( "Detaching parent process." )
 
+    # Main loop
     with dcontext:
 
         while True:
-
+            # Check for existing Cloud Backup instances.
             findRCloneInstances( pname = "python cloudBackup.py" )
 
+            # Check that a RClone configuration exists.
             findRCloneConfig( )
+
+            # Test by checking the Google Drive directory for backups exists.
             testRCloneConfig( )
+
+            # Clean user input dir and file strings 
             prepPaths( )
+
+            # Prepare final RClone command.
             prepExecStrings( )
+
+            # Schedule RClone command for execution.
             scheduleRCloneCmds( config.max_sess )
 
+            # Sleep between backups
             #time.sleep( 10 )
             if config.dt > 0:
 
@@ -619,4 +639,4 @@ def main( ):
 
 if __name__ == "__main__":
 
-        main( )
+    main( )
