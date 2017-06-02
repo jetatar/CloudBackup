@@ -477,7 +477,7 @@ def getCmdByPID( pid ):
 #
 #   Argument parser.
 #
-def parseOptions( args ):
+def parseOptions( argv ):
 
     # config file parser (PARENT) 
     # Turn off -h/help in parent parser, so it doesn't print options twice (child)
@@ -494,15 +494,15 @@ def parseOptions( args ):
                         help        = "Specify config file to use.",
                         metavar     = "FILE" )
 
-    args, rem_args = parser.parse_known_args( ) # default taken from sys.argv[1:]
+    args, rem_args = cnparser.parse_known_args( ) # default taken from sys.argv[1:]
 
     defaults = {    "dt"        : 60,
                     "max_sess"  : 2 }
 
-    if args.conf_file:
+    if args.configfl:
 
         config = ConfigParser.SafeConfigParser( )
-        config.read( [args.conf_file] )
+        config.read( [args.configfl] )
         defaults.update( dict(config.items("defaults")) )
 
 
