@@ -2,7 +2,8 @@
 
 #   TODO: Add .exclude-clean as .backup-clean
 #
-#   Ver. pre-alpha :)
+#   J. Tatar
+#   Ver. alpha
 
 
 import sys
@@ -29,6 +30,7 @@ rconfdir        = basedir + "/.config/rclone/rclone.conf"
 confname        = "gDrive"
 logdir          = clouddir + "/logs"
 logfl           = logdir + "/cloudbackup.log"
+configfl        = clouddir + "/config"
 sesslogdir      = logdir + "/sessions"
 cloudpidfl      = clouddir + "/cloudbackup.pid"
 
@@ -479,6 +481,8 @@ def getCmdByPID( pid ):
 #
 def parseOptions( argv ):
 
+    log = logging.getLogger( __name__ )
+
     # config file parser (PARENT) 
     # Turn off -h/help in parent parser, so it doesn't print options twice (child)
     # the --config_file option has to be parsed first, if we want to be able to
@@ -499,17 +503,31 @@ def parseOptions( argv ):
     defaults = {    "dt"        : 60,
                     "max_sess"  : 2 }
 
+    # If config file path is specified by user read the file.
+    global configfl
+
     if args.configfl:
 
-        config = ConfigParser.SafeConfigParser( )
-        config.read( [args.configfl] )
-        defaults.update( dict(config.items("defaults")) )
+        configfl = args.configfl
 
+        log.info( "Trying to load user specified config file {}.".format(configfl) )
+
+    # If not specified by user, look for config file in default location.
+    else:
+
+        log.info( "Looking for config file in {}".format(configfl) )
+
+    config = ConfigParser.SafeConfigParser( )
+    config.read( [configfl] )
+    # If config file reading is successful, overwrite defaults.
+    defaults.update( dict(config.items(confname)) )
 
     # Create a child parser that inherits options from parents.
     # Not suppressing help here, so -h/--help will work.
     parser  = argparse.ArgumentParser( parents = [cnparser] )
 
+    # Set (in order of priority) 1. defaults 2. config file 3. user specified
+    # options.
     parser.set_defaults( **defaults )
 
     parser.add_argument( "-dt", "--delta_t",
