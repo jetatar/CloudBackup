@@ -1,1 +1,0 @@
--ravC --delete-excluded -e 'ssh -T -c arcfour -o Compression=no -x' --relative --one-file-system --human-readable --stats --times --sparse --numeric-ids --min-size=5
