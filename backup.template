@@ -1,0 +1,4 @@
+# Backup all of user's pub dirs
+/pub/jtatar
+# Backup all of user's data dirs
+/data/users/jtatar

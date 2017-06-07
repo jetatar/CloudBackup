@@ -1,0 +1,5 @@
+# The name of the RClone configuration you created MUST be 'gDrive'.  Do not change.
+[gDrive]
+
+dt          = 60    # delta time (sleep time, in minutes, between backups)
+max_sess    = 2     # maximum simultaneous RClone sessions.  Keep at 2.
