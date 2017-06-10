@@ -214,32 +214,26 @@ def parseSourceFile( sourcefl ):
 
     log = logging.getLogger( __name__ )    
 
-    cmd     = ( ['/usr/bin/dos2unix', str(sourcefl)] )
+    with open( sourcefl, 'rb' ) as sfl:
+        text = sfl.read().replace( '\r\n', '\n' )
 
-    result  = subprocess.Popen( cmd, shell = False )
-    (cleanerSource, err) = result.communicate( )
+    with open( sourcefl, 'wb' ) as ofl:
+        ofl.write( text )
 
-    if result.returncode != 0:
+    # Duplicating Selective Backup 'sed' string
+    # Note: This excludes wild-cards being allowed for paths in the source file.
+    sedstr  = [ "s/\..//", "s/([`$&|><?])//g", "s/#.*//", "s,/\+$,,",\
+                "s/^[ \t]*//", "s/ *$//", "/^$/d" ]
 
-        log.info( "!!! Failed to parse {0}".format(sourcefl) )
+    outfl   = open( cleansourcefl, "w" )
 
-        sys.exit() 
-
-    else:
-        # Duplicating Selective Backup 'sed' string
-        # Note: This excludes wild-cards being allowed for paths in the source file.
-        sedstr  = [ "s/\..//", "s/([`$&|><?])//g", "s/#.*//", "s,/\+$,,",\
-                    "s/^[ \t]*//", "s/ *$//", "/^$/d" ]
-
-        outfl   = open( cleansourcefl, "w" )
-
-        cmd     = ( ['sed', '-e', sedstr[0], '-e', sedstr[1], '-e', sedstr[2],\
+    cmd     = ( ['sed', '-e', sedstr[0], '-e', sedstr[1], '-e', sedstr[2],\
                     '-e', sedstr[3], '-e', sedstr[4], '-e', sedstr[5],\
                     '-e', sedstr[6], sourcefl] )
 
-        res     = subprocess.call( cmd, stdout = outfl ) 
+    res     = subprocess.call( cmd, stdout = outfl ) 
 
-        outfl.close( )
+    outfl.close( )
 
 
 #
@@ -302,12 +296,12 @@ def prepExecStrings( ):
 
             log.info( "Generating final RClone command string." )
 
-            cmd = [ "/data/apps/rclone/1.35/bin/rclone copy -vv {0} {1}"\
-                        " --exclude-from {2} "\
+            cmd = [ "{0} copy -vv {1} {2}"\
+                        " --exclude-from {3} "\
                         "--dump-filters --transfers=32 "\
                         "--checkers=16 --drive-chunk-size=16384k "\
                         "--drive-upload-cutoff=16384k --drive-use-trash"\
-                        .format(src, dest, excludefl) \
+                        .format(rc_exe_path, src, dest, excludefl) \
                                         for (src, dest) in zip(spath, epath) ]
 
             log.info( "{}".format(cmd) )
