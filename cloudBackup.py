@@ -34,6 +34,8 @@ configfl        = clouddir + "/config"
 sesslogdir      = logdir + "/sessions"
 cloudpidfl      = clouddir + "/cloudbackup.pid"
 
+rc_exe_path     = ""
+
 sourcefl        = clouddir + "/backup"
 cleansourcefl   = clouddir + "/.backup_clean"
 excludefl       = clouddir + "/exclude"
@@ -174,7 +176,8 @@ def testRCloneConfig( ):
 
     log             = logging.getLogger( __name__ )
 
-    cmd             = ( ['/data/apps/rclone/1.35/bin/rclone', 'lsd',
+    #cmd             = ( ['/data/apps/rclone/1.35/bin/rclone', 'lsd',
+    cmd             = ( [rc_exe_path, 'lsd',
                                                             str(confname)+":"] )
                                             #shell = True security hazard?
     result          = subprocess.Popen( cmd,    stdout = subprocess.PIPE, 
@@ -477,6 +480,31 @@ def getCmdByPID( pid ):
         return '' 
 
 #
+#   Look an executible (like RClone) in all $PATH dirs.
+#
+def findExe( exe ):
+
+    log = logging.getLogger( __name__ )
+
+    for path in os.environ["PATH"].split( os.pathsep ):
+
+        path    = path.strip( '"' )
+        exefl   = os.path.join( path, exe ) 
+
+        if os.path.isfile( exefl ) and os.access( exefl, os.X_OK ):
+            
+            log.info( "Found RClone executible to use as default: {}"\
+                                                                .format(exefl) )
+
+            return exefl
+
+    log.info( "Can't find an RClone executible to use!" )
+
+    return None
+
+
+
+#
 #   Argument parser.
 #
 def parseOptions( argv ):
@@ -500,8 +528,9 @@ def parseOptions( argv ):
 
     args, rem_args = cnparser.parse_known_args( ) # default taken from sys.argv[1:]
 
-    defaults = {    "dt"        : 60,
-                    "max_sess"  : 2 }
+    defaults = {    "dt"            : 60,
+                    "max_sess"      : 2,
+                    "rc_exe_path"   : rc_exe_path }
 
     # If config file path is specified by user read the file.
     global configfl
@@ -516,6 +545,7 @@ def parseOptions( argv ):
     else:
 
         log.info( "Looking for config file in {}".format(configfl) )
+
 
     config = ConfigParser.SafeConfigParser( )
     config.read( [configfl] )
@@ -543,6 +573,13 @@ def parseOptions( argv ):
                         required    = False,
                         help        = "Maximum number of simultaneous RClone sessions.  DO NOT EXCEED 2 (FOR NOW)",
                         metavar     = "NUMBER" )
+
+    parser.add_argument( "-rc", "--rc_exe_path",
+                        type        = str,
+                        dest        = "rc_exe_path",
+                        required    = False,
+                        help        = "Specify RClone executible's path",
+                        metavar     = "PATH" )
 
     parser.add_argument( "stop",
                         nargs       = '?',
@@ -615,8 +652,26 @@ def main( argv = None ):
     confLogging( )
     log     = logging.getLogger( __name__ )
 
+    # Try to find RClone path and use it as default
+    global rc_exe_path
+    rc_exe_path = findExe( "rclone" )
+
     # Configure option parsing
     config  = parseOptions( argv )
+
+    if config.rc_exe_path:
+
+        rc_exe_path = config.rc_exe_path
+
+        log.info( "Using RClone: {}".format(config.rc_exe_path) )
+
+    else:
+        log.info( "Can't find a valid RClone executible. "\
+                    "Please specify it in config file or set it using "\
+                    "--rc_exe_path option." )
+
+        sys.exit( )
+
 
     if config.stop == "stop":
 
