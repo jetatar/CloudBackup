@@ -3,3 +3,4 @@
 
 dt          = 60    # delta time (sleep time, in minutes, between backups)
 max_sess    = 2     # maximum simultaneous RClone sessions.  Keep at 2.
+rc_exe_path = /data/apps/rclone/1.35/bin/rclone # path to RClone executible, no quotes
