@@ -26,7 +26,7 @@ from collections import deque
 basedir         = os.path.expanduser( "~" )
 #basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
 clouddir        = basedir + "/.hpc_cloud_backup"
-rconfdir        = basedir + "/.config/rclone/rclone.conf"
+rc_conf_file    = ""
 confname        = "gDrive"
 logdir          = clouddir + "/logs"
 logfl           = logdir + "/cloudbackup.log"
@@ -148,23 +148,26 @@ def getRCloneInstances( pid = None, pname = "", pfl = "" ):
 #
 def findRCloneConfig( ):
 
+    global rc_conf_file
+
     log     = logging.getLogger( __name__ )
 
-    if os.path.isfile(rconfdir):
+    if os.path.isfile(rc_conf_file):
 
-        log.info( "Configuration file %s found." % rconfdir )
+        log.info( "Configuration file %s found." % rc_conf_file )
 
-        if confname in open(rconfdir).read():
+        if confname in open(rc_conf_file).read():
             log.info( "Found %s configuration for UCI HPC Cloud backup."\
                                                                 % confname )
 
         else:
             log.info( "!!! RClone configuration name %s for UCI HPC Cloud backup "\
-                                    "not found in %s" % (confname, rconfdir) )
+                                    "not found in %s" % (confname, rc_conf_file) )
             sys.exit( )
 
     else:
         log.info( "!!! RClone configuration file not found. :(" )
+        log.info( "!!! Specify the RClone config path with --rc_conf_file=PATH" )
 
         sys.exit( )
 
@@ -524,7 +527,8 @@ def parseOptions( argv ):
 
     defaults = {    "dt"            : 60,
                     "max_sess"      : 2,
-                    "rc_exe_path"   : rc_exe_path }
+                    "rc_exe_path"   : rc_exe_path,
+                    "rc_conf_file"  : rc_conf_file }
 
     # If config file path is specified by user read the file.
     global configfl
@@ -574,6 +578,12 @@ def parseOptions( argv ):
                         required    = False,
                         help        = "Specify RClone executible's path",
                         metavar     = "PATH" )
+
+    parser.add_argument( "-rconf", "--rc_conf_file",
+                        dest        = "rc_conf_file",
+                        required    = False,
+                        help        = "Specify path to RClone config file to use.",
+                        metavar     = "FILE" )
 
     parser.add_argument( "stop",
                         nargs       = '?',
@@ -650,6 +660,10 @@ def main( argv = None ):
     global rc_exe_path
     rc_exe_path = findExe( "rclone" )
 
+    # Setting default RClone config file path.
+    global rc_conf_file
+    rc_conf_file    = basedir + "/.config/rclone/rclone.conf"
+
     # Configure option parsing
     config  = parseOptions( argv )
 
@@ -666,6 +680,17 @@ def main( argv = None ):
 
         sys.exit( )
 
+    if config.rc_conf_file:
+        
+        rc_conf_file = config.rc_conf_file
+
+        log.info( "Trying to load user specified RClone config file {}"\
+                                                        .format(rc_conf_file) )
+    else:
+        
+        log.info( "Looking for RClone config file in {}".format(rc_conf_file) )
+
+
 
     if config.stop == "stop":
 
@@ -678,6 +703,8 @@ def main( argv = None ):
     print "-> Staring Cloud Backup...\n  Check {} for status.".format( logfl )
     log.info( "Staring Cloud Backup." )
 
+    # Check that a RClone configuration exists.
+    findRCloneConfig( )
 
     # Daemonize.  From here on, stderr, stdout are redirected to log files.
     pf          = daemon.pidfile.TimeoutPIDLockFile( cloudpidfl, -1 )
@@ -708,9 +735,6 @@ def main( argv = None ):
         while True:
             # Check for existing Cloud Backup instances.
             findRCloneInstances( pname = "python cloudBackup.py" )
-
-            # Check that a RClone configuration exists.
-            findRCloneConfig( )
 
             # Test by checking the Google Drive directory for backups exists.
             testRCloneConfig( )
