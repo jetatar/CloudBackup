@@ -41,6 +41,8 @@ cleansourcefl   = clouddir + "/.backup_clean"
 excludefl       = clouddir + "/exclude"
 rclonecmdfl     = clouddir + "/.backup_rclonecmd"
 
+qjobsdir        = clouddir + "/queue/jobs"
+
 #dt              = 1 # time between backups (1 min after the first backup ends, the second will begin)
 
 
@@ -309,11 +311,21 @@ def prepExecStrings( ):
 
             log.info( "{}".format(cmd) )
 
+            # Write out all commands that will be executed to a file.
             with open(rclonecmdfl, "w") as cfl:
 
                 cfl.write( '\n'.join(cmd) )
                 cfl.close( )
 
+            # Generate jobs queue.
+            for i, c in enumerate( cmd, start = 1 ):
+
+                qflnm = qjobsdir + "/cloudJob.{}".format( i ) 
+
+                with open( qflnm, "w" ) as qfl:
+
+                    qfl.write( "%s\n" % c )
+                    qfl.close( )
 
         else:
 
@@ -585,9 +597,17 @@ def parseOptions( argv ):
                         help        = "Specify path to RClone config file to use.",
                         metavar     = "FILE" )
 
+#    parser.add_argument( "qsub",
+#                        nargs       = '?',
+#                        const       = 'qsub',
+#                        default     = 'qsub',
+#                        required    = False,
+#                           help        = "Submit job to queue" )
+
     parser.add_argument( "stop",
                         nargs       = '?',
                         help        = "Stop backup" )
+
 
     #parser.add_argument( "status", nargs = '?' )
 
