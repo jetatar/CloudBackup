@@ -20,10 +20,12 @@ import lockfile
 import argparse
 import ConfigParser
 from collections import deque
+import getpass
 
 # Local configs
 
 basedir         = os.path.expanduser( "~" )
+username        = getpass.getuser( )
 #basedir         = "/data/users/jtatar"  # NOTE: no '/' at the end of the path
 clouddir        = basedir + "/.hpc_cloud_backup"
 rc_conf_file    = ""
@@ -41,7 +43,11 @@ cleansourcefl   = clouddir + "/.backup_clean"
 excludefl       = clouddir + "/exclude"
 rclonecmdfl     = clouddir + "/.backup_rclonecmd"
 
+qdir            = clouddir + "/queue"
 qjobsdir        = clouddir + "/queue/jobs"
+qlogsdir        = clouddir + "/queue/logs"
+queues          = "grb,grb64"
+maxqjobs        = 0
 
 #dt              = 1 # time between backups (1 min after the first backup ends, the second will begin)
 
@@ -320,12 +326,18 @@ def prepExecStrings( ):
             # Generate jobs queue.
             for i, c in enumerate( cmd, start = 1 ):
 
-                qflnm = qjobsdir + "/cloudJob.{}".format( i ) 
+                global maxqjobs
+
+                qflnm       = qjobsdir + "/cloudJob.{}".format( i ) 
+                maxqjobs    += 1
 
                 with open( qflnm, "w" ) as qfl:
 
                     qfl.write( "%s\n" % c )
                     qfl.close( )
+
+            if maxqjobs > 0:
+                log.info( "Job submission files generated." )
 
         else:
 
@@ -597,21 +609,17 @@ def parseOptions( argv ):
                         help        = "Specify path to RClone config file to use.",
                         metavar     = "FILE" )
 
-#    parser.add_argument( "qsub",
-#                        nargs       = '?',
-#                        const       = 'qsub',
-#                        default     = 'qsub',
-#                        required    = False,
-#                           help        = "Submit job to queue" )
+    parser.add_argument( "-qsub",
+                        nargs       = '?',
+                        const       = 'qsub',
+                        default     = 'qsub',
+                        required    = False,
+                        help        = "Create job submission files for queues" )
 
     parser.add_argument( "stop",
                         nargs       = '?',
                         help        = "Stop backup" )
 
-
-    #parser.add_argument( "status", nargs = '?' )
-
-    #parser.add_argument( "qsub", nargs = '?' )
 
     return parser.parse_args( rem_args )
 
@@ -764,6 +772,30 @@ def main( argv = None ):
 
             # Prepare final RClone command.
             prepExecStrings( )
+
+            if maxqjobs > 0:
+
+                log.info( "Created scheduler submit scripts for {} serial jobs."\
+                                                                .format(maxqjobs) )
+
+                subscript = [   '#!/bin/bash\n',
+                                '#$ -t 1-{}\n'.format(maxqjobs),
+                                '#$ -N cloudbkp.{}\n'.format(username),
+                                '#$ -q {}\n'.format(queues),
+                                '#$ -V\n'
+                                '#$ -o {}\n'.format(qlogsdir),
+                                '#$ -j y\n',
+                                '\n',
+                                'bash {}/.${{SGE_TASK_ID}}\n'.format(qjobsdir) ]
+
+                with open( qdir + "/sgeQsub.sh", 'w' ) as qfl:
+                    for ln in subscript:
+                        #log.info( "{}".format(ln) )
+                        qfl.write( "{}".format(ln) )
+
+            if config.qsub:
+
+                sys.exit( )
 
             # Schedule RClone command for execution.
             scheduleRCloneCmds( config.max_sess )
